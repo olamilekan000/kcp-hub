@@ -10,7 +10,7 @@ share APIs with each other. From there, shape it into the platform you need.
 
 kcp hub runs from this repository. It puts together pre-built components from
 [contrib-virtual-workspaces](https://github.com/kcp-dev/contrib-virtual-workspaces)
-into one platform.
+into one platform. The web console lives here, in [console/](console/).
 
 ## What it gives you
 

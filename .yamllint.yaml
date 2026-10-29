@@ -1,5 +1,9 @@
 extends: default
 
+ignore: |
+  console/node_modules/
+  console/dist/
+
 rules:
   document-start: disable
   line-length:

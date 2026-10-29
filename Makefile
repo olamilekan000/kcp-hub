@@ -17,11 +17,25 @@ up: ## Create a kind cluster running kcp at https://kcp.localhost:8443
 down: ## Delete the kind cluster and everything in .hub/
 	hack/down.sh
 
+##@ Console
+
+.PHONY: console-dev
+console-dev: ## Run the console dev server on http://localhost:5173
+	cd console && npm install && npm run dev
+
+.PHONY: console-image
+console-image: ## Build the console image as kcp-hub/console:dev
+	docker build -t kcp-hub/console:dev console
+
 ##@ Checks
 
 .PHONY: test
 test: ## Smoke test a running platform (not implemented yet)
 	$(call not-yet,8)
+
+.PHONY: test-console
+test-console: ## Type check, build and test the console (needs node and go)
+	cd console && npm ci && npm run build && npm test && go test ./...
 
 .PHONY: lint
 lint: lint-yaml lint-shell ## Run all linters
@@ -40,7 +54,7 @@ lint-shell: ## Lint shell scripts (needs shellcheck)
 .PHONY: help
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make <target>\n"} \
-		/^[a-zA-Z_-]+:.*##/ { printf "  %-12s %s\n", $$1, $$2 } \
+		/^[a-zA-Z_-]+:.*##/ { printf "  %-14s %s\n", $$1, $$2 } \
 		/^##@/ { printf "\n%s\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 	@printf '%s\n' \
 		'' \
