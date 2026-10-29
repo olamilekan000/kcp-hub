@@ -1,0 +1,29 @@
+apiVersion: gateway.networking.k8s.io/v1alpha3
+kind: TLSRoute
+metadata:
+  name: front-proxy
+spec:
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+  hostnames:
+    - kcp.localhost
+  rules:
+    - backendRefs:
+        - name: frontproxy-front-proxy
+          port: 8443
+---
+apiVersion: gateway.networking.k8s.io/v1alpha3
+kind: TLSRoute
+metadata:
+  name: root
+spec:
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+  hostnames:
+    - root.kcp.localhost
+  rules:
+    - backendRefs:
+        - name: root-kcp
+          port: 6443

@@ -1,0 +1,56 @@
+apiVersion: operator.kcp.io/v1alpha1
+kind: RootShard
+metadata:
+  name: root
+spec:
+  external:
+    hostname: kcp.localhost
+    port: 8443
+  shardBaseURL: https://root.kcp.localhost:8443
+  image:
+    tag: main
+  certificates:
+    issuerRef:
+      group: cert-manager.io
+      kind: Issuer
+      name: selfsigned
+  certificateTemplates:
+    server:
+      spec:
+        dnsNames:
+          - root.kcp.localhost
+  cache:
+    embedded:
+      enabled: true
+  etcd:
+    endpoints:
+      - http://etcd.kcp-etcd.svc.cluster.local:2379
+  auth:
+    serviceAccount:
+      enabled: true
+  extraArgs:
+    - --feature-gates=CacheAPIs=true,WorkspaceMounts=true
+    - --etcd-prefix=/shard/root
+  # kcp calls itself on its external hostnames, so inside the cluster they
+  # have to resolve to the gateway too.
+  deploymentTemplate:
+    spec:
+      template:
+        spec:
+          hostAliases:
+            - ip: 10.96.2.2
+              hostnames:
+                - kcp.localhost
+                - root.kcp.localhost
+  proxy:
+    image:
+      tag: main
+    deploymentTemplate:
+      spec:
+        template:
+          spec:
+            hostAliases:
+              - ip: 10.96.2.2
+                hostnames:
+                  - kcp.localhost
+                  - root.kcp.localhost

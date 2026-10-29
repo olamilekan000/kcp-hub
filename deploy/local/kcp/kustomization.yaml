@@ -1,0 +1,10 @@
+# kcp itself, as kcp-operator resources: one root shard, the front-proxy in
+# front of it, routes through the gateway, and an admin kubeconfig.
+namespace: kcp
+resources:
+  - namespace.yaml
+  - issuer.yaml
+  - rootshard.yaml
+  - frontproxy.yaml
+  - routes.yaml
+  - admin-kubeconfig.yaml

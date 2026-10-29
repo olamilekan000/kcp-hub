@@ -10,17 +10,17 @@ endef
 ##@ Platform
 
 .PHONY: up
-up: ## Start the local platform in a kind cluster
-	$(call not-yet,2)
+up: ## Create a kind cluster running kcp at https://kcp.localhost:8443
+	hack/up.sh
 
 .PHONY: down
-down: ## Delete the local platform
-	$(call not-yet,2)
+down: ## Delete the kind cluster and everything in .hub/
+	hack/down.sh
 
 ##@ Checks
 
 .PHONY: test
-test: ## Smoke test a running platform
+test: ## Smoke test a running platform (not implemented yet)
 	$(call not-yet,8)
 
 .PHONY: lint
@@ -42,3 +42,10 @@ help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage: make <target>\n"} \
 		/^[a-zA-Z_-]+:.*##/ { printf "  %-12s %s\n", $$1, $$2 } \
 		/^##@/ { printf "\n%s\n", substr($$0, 5) }' $(MAKEFILE_LIST)
+	@printf '%s\n' \
+		'' \
+		'make up needs docker, kind, kubectl, helm and curl. Afterwards:' \
+		'  export KUBECONFIG=$$PWD/.hub/admin.kubeconfig' \
+		'  kubectl get workspaces' \
+		'' \
+		'Set CLUSTER_NAME to use a cluster name other than kcp-hub.'

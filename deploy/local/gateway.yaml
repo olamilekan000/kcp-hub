@@ -1,0 +1,52 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: kind
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        # Pinned to the node port deploy/local/kind.yaml maps to the host.
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - port: 8443
+                  nodePort: 30443
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: eg
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: kind
+    namespace: envoy-gateway-system
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: eg
+  namespace: envoy-gateway-system
+spec:
+  # Pods reach the kcp hostnames through this address (see hostAliases in
+  # deploy/local/kcp), the same way the host reaches them on port 8443.
+  addresses:
+    - type: IPAddress
+      value: 10.96.2.2
+  gatewayClassName: eg
+  listeners:
+    - name: passthrough
+      protocol: TLS
+      port: 8443
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: All
