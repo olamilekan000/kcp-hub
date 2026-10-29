@@ -1,0 +1,22 @@
+# One etcd member shared by kcp, which keeps its data apart with
+# --etcd-prefix. Taken from kcp's contrib/tilt setup.
+namespace: kcp-etcd
+resources:
+  - namespace.yaml
+  - https://github.com/ntnn/kustomize-etcd?ref=main
+
+# The upstream StatefulSet is a 3-member cluster. Scaling it down is not
+# enough on its own: --initial-cluster (container arg 8) still lists three
+# members, and a lone member would wait for quorum forever.
+# yamllint disable rule:line-length
+patches:
+  - target:
+      kind: StatefulSet
+      name: etcd
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/args/8
+        value: --initial-cluster=etcd-0=$(URI_SCHEME)://etcd-0.$(SERVICE_NAME).$(K8S_NAMESPACE).svc.$(CLUSTER_DOMAIN):2380

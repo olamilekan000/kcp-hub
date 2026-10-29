@@ -1,0 +1,30 @@
+apiVersion: operator.kcp.io/v1alpha1
+kind: FrontProxy
+metadata:
+  name: frontproxy
+spec:
+  rootShard:
+    ref:
+      name: root
+  external:
+    hostname: kcp.localhost
+    port: 8443
+  image:
+    tag: main
+  certificateTemplates:
+    server:
+      spec:
+        dnsNames:
+          - kcp.localhost
+  auth:
+    serviceAccount:
+      enabled: true
+  deploymentTemplate:
+    spec:
+      template:
+        spec:
+          hostAliases:
+            - ip: 10.96.2.2
+              hostnames:
+                - kcp.localhost
+                - root.kcp.localhost
