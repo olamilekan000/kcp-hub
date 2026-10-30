@@ -42,6 +42,24 @@ into one platform. The web console lives here, in [console/](console/).
 - **Easy to run.** One command for a full local environment, and the aim is
   an equally simple install in your own cluster.
 
+## Terminology
+
+| Term | Meaning |
+|---|---|
+| Workspace | kcp's unit of isolation: an API server of its own, with its own APIs, objects and RBAC. Workspaces nest, like directories. |
+| APIExport | How a workspace offers an API to other workspaces. |
+| APIBinding | How a workspace takes up an API that another workspace exports. |
+| Virtual workspace | An API that kcp serves under `/services/...` without storing anything itself. It answers each user based on what they are allowed to see. |
+| Operator | A controller that turns records, such as a Tenant, into real workspaces and permissions. |
+| Front-proxy | kcp's single entry point. It checks who the caller is and routes the request to the right workspace or virtual workspace. |
+| Tenant | An account, such as a team or a company, that holds projects and decides who may reach them. |
+| Project | A workspace where a team does its work. Every project belongs to a tenant. |
+| Membership | A grant of a role (`view`, `edit` or `admin`) on a tenant or a project, to a user or a group. |
+| Platform admin | The person who runs kcp hub. They manage tenants and producers through a narrow role, not as a kcp admin. |
+| Self-service | Letting any signed-in user request a tenant of their own, without waiting for a platform admin. |
+| Producer | A team that publishes APIs to the catalog, from a workspace of its own. |
+| Catalog | The list of published APIs that users can browse and enable. Each entry is called an offering. |
+
 ## How it fits together
 
 ![kcp hub architecture](docs/architecture.png)
@@ -75,19 +93,24 @@ kcp: the marketplace never writes into consumer workspaces.
 
 ## Running it locally
 
-`make up` creates a kind cluster with kcp at `https://kcp.localhost:8443`,
-Dex, the sign-in provider, at `https://dex.kcp.localhost:8443/dex`, and
-tenancy at `https://kcp.localhost:8443/services/tenancy`. `make down`
-deletes it again. It needs docker, kind, kubectl, helm, curl and git.
+`make up` creates a kind cluster with kcp at `https://kcp.localhost:8443`
+and Dex, the sign-in provider, at `https://dex.kcp.localhost:8443/dex`.
+Tenancy and the marketplace are served by kcp at
+`https://kcp.localhost:8443/services/tenancy` and
+`https://kcp.localhost:8443/services/marketplace`. `make down` deletes it
+all again. It needs docker, kind, kubectl, helm, curl and git.
 
 Dex has these test users, all with the password `password`:
 
 - `admin@platform.example.com`, the platform admin, who can create tenants
+  and register producers
 - `alice@team-a.example.com`, `bob@team-b.example.com` and
   `mallory@strangers.example.com`, who start out in no tenant
 
 Self-service is on, so any signed-in user can request a tenant of their
-own and then projects in it. To work as one of them:
+own and then projects in it. The catalog starts with one example API,
+Widgets from the producer `acme`, which anyone can enable in their project.
+To work as one of them:
 
 ```sh
 make login EMAIL=alice@team-a.example.com

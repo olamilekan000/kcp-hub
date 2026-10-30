@@ -1,0 +1,46 @@
+# The marketplace operator provisions producer workspaces and lets anyone
+# signed in bind what producers publish. It is not a kcp admin: it acts
+# through the marketplace exports, which init allows the
+# marketplace-operator user to use.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marketplace-operator
+  labels:
+    app: marketplace-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: marketplace-operator
+  template:
+    metadata:
+      labels:
+        app: marketplace-operator
+    spec:
+      containers:
+        - name: operator
+          image: ghcr.io/kcp-dev/contrib-virtual-workspaces/marketplace-vw:sha-14476ca92695431da25bfb43762ccadf1d5a954a
+          args:
+            - operator
+            - --kubeconfig=/etc/marketplace/kubeconfig
+            - --workspace-path=root:marketplace:controllers
+            - --catalog-workspace=root:marketplace:catalog
+            - --producers-workspace=root:marketplace:producers
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - name: kubeconfig
+              mountPath: /etc/marketplace
+              readOnly: true
+      volumes:
+        - name: kubeconfig
+          secret:
+            secretName: marketplace-operator-kubeconfig
+      hostAliases:
+        - ip: 10.96.2.2
+          hostnames:
+            - kcp.localhost
+            - root.kcp.localhost
