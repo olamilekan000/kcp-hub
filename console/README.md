@@ -34,11 +34,11 @@ bind. The UI adds no path that did not already exist.
 
 ## Running it
 
-The console needs kcp with the tenancy and marketplace components and Dex
-in front of it. Until `make up` installs those, run it against the Tilt
-stack in
-[contrib-virtual-workspaces](https://github.com/kcp-dev/contrib-virtual-workspaces),
-which serves the same APIs on the same addresses:
+`make up` builds the console from this directory and runs it in the
+cluster at `https://console.kcp.localhost:8443`; running `make up` again
+after a change redeploys it. To run a published image instead, name it:
+`CONSOLE_IMAGE=ghcr.io/olamilekan000/kcp-hub/console:main make up`. To
+work on it with hot reload, run the dev server against the same cluster:
 
 ```sh
 make console-dev   # npm install && npm run dev, on http://localhost:5173
@@ -46,10 +46,10 @@ make console-dev   # npm install && npm run dev, on http://localhost:5173
 
 Sign in as any of the Dex users — `alice@team-a.example.com`,
 `bob@team-b.example.com`, `mallory@strangers.example.com`, password
-`password`. Alice is admin of the seeded tenant, bob has `view` on its
-project, and mallory is a member of nothing: signing in as each is the
-quickest way to see that the screens follow kcp's answers rather than
-their own idea of who you are.
+`password`. None of them belongs to anything at first, so each lands on
+the first-run page and can create a tenant of their own; once two of them
+share a tenant, signing in as each is the quickest way to see that the
+screens follow kcp's answers rather than their own idea of who you are.
 
 **The Admin menu will not appear for any of them**, and that is correct.
 It is shown when kcp answers that the identity may create Tenants in
@@ -84,16 +84,27 @@ unset variable falls back to the build's default:
 | `CONSOLE_OIDC_SCOPES` | the scopes to request |
 
 The redirect URI is `<origin>/callback`, and the provider has to allow
-it — contrib's `hack/tilt/dex.yaml` registers
-`http://localhost:5173/callback` next to the CLI's loopback one.
+it, and the origin itself for the token request.
+`deploy/local/dex/dex.yaml` registers both the in-cluster console and the
+dev server.
 
-### Why the dev server proxies
+### Why the console proxies
 
-kcp sends no CORS headers, so a browser on `localhost:5173` cannot call
-`kcp.localhost:8443` directly. The dev server proxies `/services` and
-`/clusters` instead, which keeps the browser on one origin. A deployment
-does the same thing properly: serve these files behind the same
-front-proxy, and the question never arises.
+kcp sends no CORS headers, so a browser on the console's origin cannot
+call `kcp.localhost:8443` directly. Both the dev server and the image's
+server pass `/services` and `/clusters` on to the front-proxy instead,
+which keeps the browser on one origin. The server does it when started
+with `--upstream`; the request goes on with the user's own token, so kcp
+decides what each user may do and the console holds no credential:
+
+| Flag | Meaning |
+|---|---|
+| `--upstream` | the front-proxy URL to pass API requests to |
+| `--upstream-ca-file` | the CA that signs the front-proxy's certificate |
+| `--tls-cert-file`, `--tls-key-file` | serve HTTPS rather than HTTP |
+
+Without `--upstream`, whatever sits in front of the console has to route
+those two prefixes to the front-proxy itself.
 
 ## The pages
 
@@ -127,11 +138,12 @@ yet — nothing about it is selectable, so nothing else would reach it.
 
 ## First run
 
-Having no project is the one state this app cannot show anything useful
-in, because every other screen is relative to one — whether that is an
-identity belonging to nothing at all, or one in a tenant nobody has added
-a project to. Both land on **Welcome** rather than on a set of empty
-panels.
+Somebody with no project, whether they belong to nothing at all or to a
+tenant nobody has added a project to, lands on **Welcome** when they sign
+in or open the console at its root, rather than on a set of empty panels. A page opened by name keeps them there instead: the tenant and
+admin pages work without a project, so a platform admin who has none can
+still refresh `/admin`, and the pages that do need one say so and link
+here.
 
 Welcome renders inside the normal frame rather than as a page beside it: a
 first run is still a session, so the identity, Tenants and Sign out stay
@@ -156,7 +168,7 @@ workspace and seeded the admin grant, and a project is not usable until it
 has an endpoint. The wizard polls the review for exactly those two facts,
 which is also why it can tell you the honest thing if provisioning stalls.
 
-The redirect only happens when the review *succeeded* and came back empty.
+Either way, it only happens when the review *succeeded* and came back empty.
 An error means we do not know what the person has, which is not the same as
 knowing they have nothing.
 

@@ -18,12 +18,16 @@ limitations under the License.
 // for every deployment: the settings a build would otherwise bake in are
 // read from the environment at startup and served as /config.js.
 //
-// The UI only ever talks to its own origin, so the console is meant to sit
-// behind the same address as kcp's front-proxy, with /services and
-// /clusters routed to the front-proxy and everything else here.
+// The UI only ever talks to its own origin, because kcp sends no CORS
+// headers. With --upstream set, this server passes /services and /clusters
+// on to kcp's front-proxy, carrying the user's own token and holding no
+// credential of its own. Without it, something in front of the console has
+// to route those paths.
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -31,6 +35,8 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -48,6 +54,10 @@ type settings struct {
 func main() {
 	addr := flag.String("address", ":8080", "Address to listen on.")
 	root := flag.String("root", "/www", "Directory holding the built UI.")
+	upstream := flag.String("upstream", "", "kcp front-proxy URL to pass /services and /clusters on to.")
+	upstreamCA := flag.String("upstream-ca-file", "", "CA bundle that signs the front-proxy's certificate.")
+	tlsCert := flag.String("tls-cert-file", "", "Serve HTTPS with this certificate.")
+	tlsKey := flag.String("tls-key-file", "", "Key for --tls-cert-file.")
 	flag.Parse()
 
 	cfg, err := configJS(settings{
@@ -60,13 +70,54 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var api http.Handler
+	if *upstream != "" {
+		if api, err = apiProxy(*upstream, *upstreamCA); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           handler(os.DirFS(*root), cfg),
+		Handler:           handler(os.DirFS(*root), cfg, api),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	log.Printf("serving %s on %s", *root, *addr)
+	if *tlsCert != "" {
+		log.Fatal(srv.ListenAndServeTLS(*tlsCert, *tlsKey))
+	}
 	log.Fatal(srv.ListenAndServe())
+}
+
+// apiProxy passes requests on to kcp's front-proxy unchanged, including
+// the caller's Authorization header, so kcp authorizes every request as
+// the user who made it.
+func apiProxy(upstream, caFile string) (http.Handler, error) {
+	target, err := url.Parse(upstream)
+	if err != nil || target.Scheme == "" || target.Host == "" {
+		return nil, fmt.Errorf("--upstream must be a URL such as https://kcp.example.com:8443, got %q", upstream)
+	}
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12}
+	if caFile != "" {
+		pem, err := os.ReadFile(caFile)
+		if err != nil {
+			return nil, fmt.Errorf("read --upstream-ca-file: %w", err)
+		}
+		tlsConfig.RootCAs = x509.NewCertPool()
+		if !tlsConfig.RootCAs.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("--upstream-ca-file %s holds no PEM certificates", caFile)
+		}
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsConfig
+	return &httputil.ReverseProxy{
+		Rewrite:   func(r *httputil.ProxyRequest) { r.SetURL(target) },
+		Transport: transport,
+	}, nil
+}
+
+func isAPIPath(p string) bool {
+	return strings.HasPrefix(p, "/services/") || strings.HasPrefix(p, "/clusters/")
 }
 
 func configJS(s settings) ([]byte, error) {
@@ -77,9 +128,14 @@ func configJS(s settings) ([]byte, error) {
 	return fmt.Appendf(nil, "window.__CONSOLE_CONFIG__ = %s\n", b), nil
 }
 
-func handler(files fs.FS, cfg []byte) http.Handler {
+// handler serves the UI, and passes API paths to api when it is set.
+func handler(files fs.FS, cfg []byte, api http.Handler) http.Handler {
 	static := http.FileServerFS(files)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if api != nil && isAPIPath(r.URL.Path) {
+			api.ServeHTTP(w, r)
+			return
+		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 
 		switch {

@@ -1,0 +1,38 @@
+# The CA behind every certificate a browser sees in the local environment:
+# Dex and the console. Trusting its certificate (.hub/ca.crt, written by
+# hack/up.sh) once is enough for both, and a renewal of either certificate
+# does not change what has to be trusted.
+#
+# kcp's own certificates come from kcp-operator and are separate.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: hub-ca
+spec:
+  isCA: true
+  commonName: kcp hub local CA
+  secretName: hub-ca
+  duration: 87600h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned
+    kind: Issuer
+---
+# A ClusterIssuer reads its CA from the cert-manager namespace, which is
+# why the CA lives there.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: hub-ca
+spec:
+  ca:
+    secretName: hub-ca

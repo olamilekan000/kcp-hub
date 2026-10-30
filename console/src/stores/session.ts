@@ -77,6 +77,15 @@ export const useSession = defineStore('session', {
     projects(state): { tenant: string; project: ProjectClaim }[] {
       return state.tenants.flatMap((t) => (t.projects ?? []).map((p) => ({ tenant: t.name, project: p })))
     },
+
+    /**
+     * nothingToWorkIn is true once the review has answered that the identity
+     * has no project. An error, or a refused sign-in, means we do not know
+     * what they have, which is not the same as knowing they have nothing.
+     */
+    nothingToWorkIn(state): boolean {
+      return !state.loading && !state.error && !state.unauthorized && !this.projects.length
+    },
   },
 
   actions: {

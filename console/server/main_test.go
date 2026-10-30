@@ -17,9 +17,12 @@ limitations under the License.
 package main
 
 import (
+	"encoding/pem"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -36,7 +39,7 @@ func TestHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := handler(files, cfg)
+	h := handler(files, cfg, nil)
 
 	tests := []struct {
 		name, path   string
@@ -73,6 +76,51 @@ func TestHandler(t *testing.T) {
 				t.Errorf("Cache-Control = %q, want %q", got, tt.wantCache)
 			}
 		})
+	}
+}
+
+func TestAPIProxy(t *testing.T) {
+	kcp := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, r.Method+" "+r.URL.RequestURI()+" "+r.Header.Get("Authorization"))
+	}))
+	defer kcp.Close()
+
+	caFile := filepath.Join(t.TempDir(), "ca.crt")
+	ca := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: kcp.Certificate().Raw})
+	if err := os.WriteFile(caFile, ca, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	api, err := apiProxy(kcp.URL, caFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := handler(fstest.MapFS{"index.html": {Data: []byte("<html>app</html>")}}, nil, api)
+
+	tests := []struct {
+		name, path, want string
+	}{
+		{"virtual workspaces go to kcp", "/services/tenancy/apis?watch=1",
+			"POST /services/tenancy/apis?watch=1 Bearer user-token"},
+		{"workspaces go to kcp", "/clusters/root:abc/api/v1",
+			"POST /clusters/root:abc/api/v1 Bearer user-token"},
+		{"everything else is the app", "/services", "<html>app</html>"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, tt.path, nil)
+			req.Header.Set("Authorization", "Bearer user-token")
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if body := rec.Body.String(); body != tt.want {
+				t.Errorf("body = %q (status %d), want %q", body, rec.Code, tt.want)
+			}
+		})
+	}
+}
+
+func TestAPIProxyRejectsABadUpstream(t *testing.T) {
+	if _, err := apiProxy("kcp.example.com", ""); err == nil {
+		t.Error("an upstream without a scheme was accepted")
 	}
 }
 

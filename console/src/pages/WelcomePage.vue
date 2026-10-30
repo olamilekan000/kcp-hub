@@ -17,6 +17,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import Panel from '@/components/Panel.vue'
 import Stepper from '@/components/Stepper.vue'
 import NestingDiagram from '@/components/NestingDiagram.vue'
+import Spinner from '@/components/Spinner.vue'
+import StateBlock from '@/components/StateBlock.vue'
 
 const session = useSession()
 const router = useRouter()
@@ -150,8 +152,14 @@ onMounted(async () => {
     <div v-if="error" class="k-note k-note--danger mb-4">{{ error }}</div>
     <div v-else-if="note" class="k-note k-note--success mb-4">{{ note }}</div>
 
+    <!-- Which step to show depends on what the identity already has, so
+         nothing is offered until that is known. -->
+    <div v-if="session.loading && !session.tenants.length" class="k-card">
+      <StateBlock loading loading-text="Checking what you already have…" />
+    </div>
+
     <!-- Form on the left, what it is building on the right. -->
-    <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] items-start">
+    <div v-else class="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] items-start">
       <Panel>
         <template #header>
           {{ step === 'tenant' ? 'Name your tenant'
@@ -179,6 +187,7 @@ onMounted(async () => {
               :disabled="busy || !tenantName.trim()"
               @click="createTenant"
             >
+              <Spinner v-if="busy" />
               {{ busy ? 'Creating…' : 'Create' }}
             </button>
           </div>
@@ -205,6 +214,7 @@ onMounted(async () => {
               :disabled="busy || !projectName.trim()"
               @click="createProject"
             >
+              <Spinner v-if="busy" />
               {{ busy ? 'Creating…' : 'Create' }}
             </button>
           </div>
@@ -228,7 +238,8 @@ onMounted(async () => {
 
         <!-- Provisioning is asynchronous, and the wizard waits for the thing
              to be usable rather than for the call to return. Say which. -->
-        <div v-if="busy" class="px-4 py-2.5 border-t border-edge text-[11px] text-faint">
+        <div v-if="busy" class="px-4 py-2.5 border-t border-edge text-[11px] text-faint flex items-center gap-2" role="status">
+          <Spinner :size="12" />
           {{ step === 'tenant'
              ? 'Waiting for the workspace and your admin grant…'
              : 'Waiting for the workspace to be provisioned…' }}

@@ -1,0 +1,108 @@
+# The web console at https://console.kcp.localhost:8443. Its server serves
+# the UI and passes /services and /clusters on to kcp's front-proxy with
+# the user's own token, so the browser stays on one origin and the console
+# holds no credential.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: console-tls
+spec:
+  secretName: console-tls
+  dnsNames:
+    - console.kcp.localhost
+  issuerRef:
+    name: hub-ca
+    kind: ClusterIssuer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: console
+  labels:
+    app: console
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: console
+  template:
+    metadata:
+      labels:
+        app: console
+    spec:
+      containers:
+        - name: console
+          # Built from console/ and loaded into kind by hack/up.sh, which
+          # puts CONSOLE_IMAGE here instead when it is set.
+          image: kcp-hub/console:dev
+          imagePullPolicy: IfNotPresent
+          args:
+            - --address=:8443
+            - --tls-cert-file=/etc/console/tls/tls.crt
+            - --tls-key-file=/etc/console/tls/tls.key
+            - --upstream=https://frontproxy-front-proxy.kcp.svc.cluster.local:8443
+            - --upstream-ca-file=/etc/console/kcp-ca/ca.crt
+          env:
+            # Shown to users in instructions, so it is kcp's public address.
+            - name: CONSOLE_KCP_SERVER
+              value: https://kcp.localhost:8443
+            - name: CONSOLE_OIDC_ISSUER
+              value: https://dex.kcp.localhost:8443/dex
+            - name: CONSOLE_OIDC_CLIENT_ID
+              value: kcp
+          ports:
+            - containerPort: 8443
+          readinessProbe:
+            httpGet:
+              scheme: HTTPS
+              path: /healthz
+              port: 8443
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/console/tls
+              readOnly: true
+            - name: kcp-ca
+              mountPath: /etc/console/kcp-ca
+              readOnly: true
+      volumes:
+        - name: tls
+          secret:
+            secretName: console-tls
+        # Only the certificate of the CA that signs the front-proxy's
+        # serving certificate, not its key.
+        - name: kcp-ca
+          secret:
+            secretName: root-server-ca
+            items:
+              - key: tls.crt
+                path: ca.crt
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: console
+spec:
+  selector:
+    app: console
+  ports:
+    - port: 8443
+      targetPort: 8443
+---
+apiVersion: gateway.networking.k8s.io/v1alpha3
+kind: TLSRoute
+metadata:
+  name: console
+spec:
+  parentRefs:
+    - name: eg
+      namespace: envoy-gateway-system
+  hostnames:
+    - console.kcp.localhost
+  rules:
+    - backendRefs:
+        - name: console
+          port: 8443

@@ -13,6 +13,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import RoleBadge from '@/components/RoleBadge.vue'
+import Spinner from '@/components/Spinner.vue'
 
 const session = useSession()
 const route = useRoute()
@@ -157,6 +158,7 @@ watch([name, mayManage], load)
             :disabled="busy === 'add' || !subject.trim()"
             @click="add"
           >
+            <Spinner v-if="busy === 'add'" />
             {{ busy === 'add' ? 'Granting…' : 'Grant' }}
           </button>
         </div>
@@ -189,7 +191,8 @@ watch([name, mayManage], load)
                     :disabled="busy === m.metadata.name"
                     @click="remove(m)"
                   >
-                    {{ busy === m.metadata.name ? '…' : 'Revoke' }}
+                    <Spinner v-if="busy === m.metadata.name" :size="12" />
+                    {{ busy === m.metadata.name ? 'Revoking…' : 'Revoke' }}
                   </button>
                 </td>
               </tr>

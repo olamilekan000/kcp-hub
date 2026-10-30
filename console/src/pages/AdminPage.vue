@@ -9,6 +9,7 @@ import { list, createObject, canI, ApiError } from '@/lib/api'
 import PageHeader from '@/components/PageHeader.vue'
 import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
+import Spinner from '@/components/Spinner.vue'
 
 const session = useSession()
 
@@ -136,6 +137,7 @@ onMounted(async () => {
           @keyup.escape="showForm = false"
         />
         <button class="k-btn k-btn--primary" :disabled="creating || !nameValid" @click="registerProducer">
+          <Spinner v-if="creating" />
           {{ creating ? 'Registering…' : 'Register' }}
         </button>
         <button class="k-btn k-btn--ghost" @click="showForm = false">Cancel</button>

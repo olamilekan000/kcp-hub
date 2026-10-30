@@ -65,18 +65,13 @@ onMounted(async () => {
   if (!session.authenticated) return
   await session.load()
   await session.checkAdmin()
+  await router.isReady()
 
-  // Every screen here is relative to a project, so having none is the one
-  // state the app cannot show anything useful in — whether that is because
-  // the identity belongs to nothing at all, or belongs to a tenant nobody
-  // has added a project to. Both land on the wizard, which asks for
-  // whichever of the two is missing.
-  //
-  // Only when the review succeeded: an error, or a refused sign-in, means
-  // we do not know what they have, which is not the same as knowing they
-  // have nothing.
-  const nothingToWorkIn = !session.error && !session.unauthorized && !session.projects.length
-  if (nothingToWorkIn && !route.meta.public && route.name !== 'welcome') {
+  // Somebody with no project who opens the console at its root lands on
+  // the wizard, which asks for whichever of tenant and project is missing.
+  // A page they opened by name keeps them there: the tenant and admin pages
+  // work without a project, and the pages that need one say so.
+  if (session.nothingToWorkIn && route.redirectedFrom?.path === '/') {
     router.replace({ name: 'welcome' })
   }
 })

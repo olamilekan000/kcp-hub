@@ -37,7 +37,7 @@ spec:
       # key is documented to default to ca.crt, but the operator does not
       # apply that default and kcp then fails to start.
       caFileRef:
-        name: dex-ca
+        name: hub-ca
         key: ca.crt
   extraArgs:
     - --feature-gates=CacheAPIs=true,WorkspaceMounts=true
