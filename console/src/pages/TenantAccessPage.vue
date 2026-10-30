@@ -14,6 +14,7 @@ import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import RoleBadge from '@/components/RoleBadge.vue'
 import Spinner from '@/components/Spinner.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const session = useSession()
 const route = useRoute()
@@ -85,16 +86,20 @@ async function add() {
   }
 }
 
+const confirming = ref<Membership | null>(null)
+
 async function remove(m: Membership) {
   busy.value = m.metadata.name
   note.value = ''
   try {
     await revoke(m.metadata.name)
+    confirming.value = null
     noteError.value = false
     note.value = `Revoked ${m.spec.role} for ${m.spec.subject.name}.`
     await load()
     if (m.spec.subject.name === session.username) await session.load()
   } catch (e) {
+    confirming.value = null
     noteError.value = true
     note.value = describe(e)
   } finally {
@@ -189,10 +194,9 @@ watch([name, mayManage], load)
                   <button
                     class="k-btn k-btn--ghost"
                     :disabled="busy === m.metadata.name"
-                    @click="remove(m)"
+                    @click="confirming = m"
                   >
-                    <Spinner v-if="busy === m.metadata.name" :size="12" />
-                    {{ busy === m.metadata.name ? 'Revoking…' : 'Revoke' }}
+                    Revoke
                   </button>
                 </td>
               </tr>
@@ -205,5 +209,19 @@ watch([name, mayManage], load)
         </div>
       </Panel>
     </template>
+
+    <ConfirmDialog
+      v-if="confirming"
+      :title="`Revoke ${confirming.spec.role} for ${confirming.spec.subject.name}?`"
+      confirm-label="Revoke"
+      busy-label="Revoking…"
+      :busy="busy === confirming.metadata.name"
+      @confirm="remove(confirming)"
+      @cancel="confirming = null"
+    >
+      {{ confirming.spec.subject.name }} loses {{ confirming.spec.role }} on
+      {{ confirming.spec.project ? `the project ${confirming.spec.project}` : `every project in ${name}` }}
+      straight away. Granting it again restores it.
+    </ConfirmDialog>
   </div>
 </template>

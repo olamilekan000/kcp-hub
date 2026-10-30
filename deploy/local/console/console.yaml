@@ -42,6 +42,9 @@ spec:
             - --tls-key-file=/etc/console/tls/tls.key
             - --upstream=https://frontproxy-front-proxy.kcp.svc.cluster.local:8443
             - --upstream-ca-file=/etc/console/kcp-ca/ca.crt
+            # The same CA signs kcp.localhost, which users reach through
+            # the gateway's passthrough to the front-proxy.
+            - --kcp-ca-file=/etc/console/kcp-ca/ca.crt
           env:
             # Shown to users in instructions, so it is kcp's public address.
             - name: CONSOLE_KCP_SERVER

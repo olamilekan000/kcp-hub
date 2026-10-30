@@ -184,7 +184,7 @@ watch([workspace, name], load)
           <div class="k-eyebrow px-0.5 pb-2 flex items-center gap-2">
             <span>Kinds</span>
             <RouterLink to="/catalog" class="ml-auto normal-case tracking-normal text-[11px] text-accent hover:underline">
-              Manage in Producers →
+              Manage in Catalog →
             </RouterLink>
           </div>
           <div v-if="served.length" class="grid gap-3 grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]">

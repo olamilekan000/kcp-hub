@@ -169,9 +169,9 @@ onMounted(async () => {
 
         <div v-if="step === 'tenant'" class="px-4 py-3.5 space-y-3">
           <p class="text-[11px] text-faint leading-relaxed">
-            A tenant is the account: it holds your projects and decides who may
-            reach them. You become its admin. Nobody works inside a tenant
-            directly — that is what the project in step 2 is for.
+            A tenant is your team's account. It holds your projects and decides
+            who can reach them, and you become its admin. You don't work in the
+            tenant itself; that is what the project in the next step is for.
           </p>
           <div class="flex gap-2">
             <input
@@ -196,9 +196,10 @@ onMounted(async () => {
 
         <div v-else-if="step === 'project'" class="px-4 py-3.5 space-y-3">
           <p class="text-[11px] text-faint leading-relaxed">
-            A project is a real kcp workspace — the thing your kubeconfig points
-            at, and where anything you enable from a producer lands. You can add
-            more later.
+            A project is where your work happens. The APIs you enable from the
+            catalog, and the ones you share with other teams, belong to a
+            project. Projects are kept apart, so you can make one per app or
+            environment. You can add more later.
           </p>
           <div class="flex gap-2">
             <input
@@ -228,7 +229,7 @@ onMounted(async () => {
           </p>
           <div class="flex gap-2">
             <button class="k-btn k-btn--primary" @click="router.push('/catalog')">
-              Browse producers
+              Browse the Catalog
             </button>
             <button class="k-btn k-btn--ghost" @click="router.push('/tenants')">
               Manage tenants

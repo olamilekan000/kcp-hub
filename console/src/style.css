@@ -164,6 +164,9 @@ body {
 
   /* ── Buttons ── */
   .k-btn {
+    font-family: var(--font-sans);
+    text-transform: none;
+    letter-spacing: normal;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -302,6 +305,16 @@ body {
     border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
     background: var(--color-success-subtle);
     color: var(--color-success);
+  }
+  .k-note--info {
+    border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+    background: var(--color-accent-subtle);
+    color: var(--color-ink);
+  }
+  .k-note--warning {
+    border-color: color-mix(in srgb, var(--color-warning) 30%, transparent);
+    background: var(--color-warning-subtle);
+    color: var(--color-ink);
   }
   .k-note--danger {
     border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);

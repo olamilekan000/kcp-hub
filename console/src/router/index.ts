@@ -1,8 +1,12 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import * as oidc from '@/lib/oidc'
+import { useSession } from '@/stores/session'
 
 const routes: RouteRecordRaw[] = [
-  { path: '/', redirect: '/catalog' },
+  // The root is wherever there is something to do: the wizard for somebody
+  // with no project yet, the catalog for everyone else. On a cold load the
+  // session is still loading here, so App.vue makes the same call again.
+  { path: '/', redirect: () => (useSession().nothingToWorkIn ? '/welcome' : '/catalog') },
   { path: '/login', name: 'login', component: () => import('@/pages/LoginPage.vue'), meta: { public: true } },
   { path: '/callback', name: 'callback', component: () => import('@/pages/CallbackPage.vue'), meta: { public: true } },
   { path: '/profile', name: 'profile', component: () => import('@/pages/ProfilePage.vue') },
@@ -23,8 +27,11 @@ const routes: RouteRecordRaw[] = [
   // halves of it — listing what is inside a tenant, and adding one. Kept
   // as a redirect so older links still land somewhere sensible.
   { path: '/projects', redirect: '/tenants' },
+  { path: '/project', name: 'project', component: () => import('@/pages/ProjectPage.vue') },
   { path: '/catalog', name: 'catalog', component: () => import('@/pages/CatalogPage.vue') },
   { path: '/api', name: 'api', component: () => import('@/pages/ApiViewerPage.vue') },
+  // The producer's side: offering this project's own APIs in the catalog.
+  { path: '/publish', name: 'publish', component: () => import('@/pages/PublishPage.vue') },
   // One enabled producer in the selected project: what it is, how to use
   // it, and what it serves. The sidebar lands here.
   { path: '/p/:binding', name: 'producer', component: () => import('@/pages/ProducerPage.vue') },

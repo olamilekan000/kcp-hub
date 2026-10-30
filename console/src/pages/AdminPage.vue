@@ -43,29 +43,45 @@ const mayRegister = ref(false)
 const showForm = ref(false)
 const newName = ref('')
 const newDisplayName = ref('')
+// provisioned: the marketplace creates a workspace for the producer.
+// external: an existing project becomes the producer's workspace, and the
+// people in it publish from the console.
+const newMode = ref<'provisioned' | 'external'>('external')
+const newPath = ref('')
 const creating = ref(false)
 const note = ref('')
 const noteError = ref(false)
 
-// The producer's name is also its workspace's name.
+// For a provisioned producer the name is also its workspace's name.
 const nameValid = computed(() => /^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/.test(newName.value.trim()))
+const pathValid = computed(() => /^root(:[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$/.test(newPath.value.trim()))
+const formValid = computed(() => nameValid.value && (newMode.value === 'provisioned' || pathValid.value))
 
 async function registerProducer() {
   const name = newName.value.trim()
-  if (!nameValid.value) return
+  const path = newPath.value.trim()
+  if (!formValid.value) return
   creating.value = true
   note.value = ''
   try {
+    const external = newMode.value === 'external'
     await createObject(CATALOG, 'marketplace.platform.kcp.io/v1alpha1', 'producers', {
       apiVersion: 'marketplace.platform.kcp.io/v1alpha1',
       kind: 'Producer',
       metadata: { name },
-      spec: { displayName: newDisplayName.value.trim() || name, mode: 'provisioned' },
+      spec: {
+        displayName: newDisplayName.value.trim() || name,
+        mode: newMode.value,
+        ...(external ? { workspacePath: path } : {}),
+      },
     })
     noteError.value = false
-    note.value = `Registered producer ${name}. Its workspace appears below once the marketplace operator has created it.`
+    note.value = external
+      ? `Registered producer ${name} for ${path}. It becomes Ready once that project allows the marketplace and publishes an API, on its Publish page.`
+      : `Registered producer ${name}. Its workspace appears below once the marketplace operator has created it.`
     newName.value = ''
     newDisplayName.value = ''
+    newPath.value = ''
     showForm.value = false
     await load()
   } catch (e) {
@@ -120,11 +136,21 @@ onMounted(async () => {
 
     <Panel v-if="session.admin && mayRegister && showForm" class="mb-4">
       <template #header>Register a producer</template>
-      <div class="p-3 flex gap-2">
+      <div class="px-3 pt-3 flex gap-4 text-xs">
+        <label class="flex items-center gap-1.5">
+          <input v-model="newMode" type="radio" value="external" />
+          An existing project
+        </label>
+        <label class="flex items-center gap-1.5">
+          <input v-model="newMode" type="radio" value="provisioned" />
+          A new workspace
+        </label>
+      </div>
+      <div class="p-3 flex flex-wrap gap-2">
         <input
           v-model="newName"
           placeholder="name, e.g. acme"
-          class="k-input flex-1 min-w-0"
+          class="k-input flex-1 min-w-40"
           autofocus
           @keyup.enter="registerProducer"
           @keyup.escape="showForm = false"
@@ -132,19 +158,37 @@ onMounted(async () => {
         <input
           v-model="newDisplayName"
           placeholder="display name (optional)"
-          class="k-input flex-1 min-w-0"
+          class="k-input flex-1 min-w-40"
           @keyup.enter="registerProducer"
           @keyup.escape="showForm = false"
         />
-        <button class="k-btn k-btn--primary" :disabled="creating || !nameValid" @click="registerProducer">
+        <input
+          v-if="newMode === 'external'"
+          v-model="newPath"
+          placeholder="project path, e.g. root:tenancy:tenants:team-a:apis"
+          class="k-input basis-full font-mono"
+          @keyup.enter="registerProducer"
+          @keyup.escape="showForm = false"
+        />
+        <button class="k-btn k-btn--primary" :disabled="creating || !formValid" @click="registerProducer">
           <Spinner v-if="creating" />
           {{ creating ? 'Registering…' : 'Register' }}
         </button>
         <button class="k-btn k-btn--ghost" @click="showForm = false">Cancel</button>
       </div>
-      <p class="px-3 pb-3 text-[11px]" :class="newName.trim() && !nameValid ? 'text-danger' : 'text-faint'">
-        The name becomes the producer's workspace name: lowercase letters, digits and hyphens, starting
-        and ending with a letter or digit. The display name can be anything.
+      <p
+        class="px-3 pb-3 text-[11px]"
+        :class="(newName.trim() && !nameValid) || (newMode === 'external' && newPath.trim() && !pathValid) ? 'text-danger' : 'text-faint'"
+      >
+        <template v-if="newMode === 'external'">
+          The people in that project publish from its Publish page, where they also find its path. The name is
+          lowercase letters, digits and hyphens; the display name can be anything.
+        </template>
+        <template v-else>
+          The name becomes the producer's workspace name: lowercase letters, digits and hyphens, starting
+          and ending with a letter or digit. Only the kcp admin can work in that workspace. The display name
+          can be anything.
+        </template>
       </p>
     </Panel>
 
@@ -181,8 +225,8 @@ onMounted(async () => {
             <tbody>
               <tr v-for="(p, i) in providers" :key="i" >
                 <td class="font-medium">{{ field(p, ['metadata', 'name']) }}</td>
-                <td class="text-muted">{{ field(p, ['status', 'phase']) }}</td>
-                <td class="text-muted">{{ field(p, ['status', 'workspacePath']) }}</td>
+                <td class="text-muted" :title="field(p, ['status', 'message'])">{{ field(p, ['status', 'phase']) }}</td>
+                <td class="text-muted font-mono text-[11px]">{{ field(p, ['status', 'workspacePath']) }}</td>
               </tr>
             </tbody>
           </table>

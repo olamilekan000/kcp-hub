@@ -32,6 +32,8 @@ interface State {
   adminChecked: boolean
   /** enabled is what the bindings in the selected project actually serve. */
   enabled: { binding: string; group: string; resource: string }[]
+  /** enabledLoaded is false while enabled is being read, so empty is not mistaken for none. */
+  enabledLoaded: boolean
 }
 
 const SELECTION = 'contrib.selection'
@@ -48,6 +50,7 @@ export const useSession = defineStore('session', {
     admin: false,
     adminChecked: false,
     enabled: [],
+    enabledLoaded: false,
   }),
 
   getters: {
@@ -150,14 +153,18 @@ export const useSession = defineStore('session', {
       const cluster = this.workspace
       if (!cluster) {
         this.enabled = []
+        this.enabledLoaded = true
         return
       }
+      this.enabledLoaded = false
       try {
         const body = await bindings(cluster)
         this.enabled = boundKinds(body.items ?? [])
       } catch {
         // Not being allowed to read bindings just means no shortcuts.
         this.enabled = []
+      } finally {
+        this.enabledLoaded = true
       }
     },
 

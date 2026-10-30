@@ -158,7 +158,7 @@ watch(groupVersion, loadKinds)
       <template v-if="!session.projects.length">
         <p>
           You are not in any project yet, so there is nothing to browse: the explorer shows the APIs
-          served inside a project, such as the ones enabled from Producers.
+          served inside a project, such as the ones enabled from the Catalog.
         </p>
         <RouterLink to="/welcome" class="text-accent hover:underline">Create a tenant and a project →</RouterLink>
       </template>

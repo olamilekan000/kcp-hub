@@ -87,6 +87,9 @@ change for them. Members work straight in their project workspaces with
 A platform admin registers a producer in the catalog, and the operator
 creates the producer's workspace. The producer publishes by annotating their
 own `APIExport`, and the operator grants others permission to bind it.
+A producer can also be an existing project: the admin registers its path,
+and the project's admins allow the marketplace in and publish from the
+console's **Publish** page.
 Consumers browse the catalog through the virtual workspace, then enable an
 API by creating an `APIBinding` in their own workspace. That binding is plain
 kcp: the marketplace never writes into consumer workspaces.
