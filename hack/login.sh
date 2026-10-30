@@ -3,7 +3,7 @@
 # kubeconfig that uses their token:
 #
 #   make login EMAIL=alice@team-a.example.com
-#   export KUBECONFIG=$PWD/.hub/alice.kubeconfig
+#   export KUBECONFIG=$PWD/.hub/users/alice.kubeconfig
 #   kubectl auth whoami
 #
 # Dex tokens expire after a day; run it again for a fresh one.
@@ -41,8 +41,11 @@ server=$(kubectl --kubeconfig "$ADMIN" config view --raw --minify -o jsonpath='{
 ca_data=$(kubectl --kubeconfig "$ADMIN" config view --raw --minify \
   -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
 
+# A directory of their own, so a user called admin cannot replace the kcp
+# admin kubeconfig.
 name=${EMAIL%%@*}
-out=$STATE/$name.kubeconfig
+out=$STATE/users/$name.kubeconfig
+mkdir -p "$STATE/users"
 umask 077
 cat >"$out" <<EOF
 apiVersion: v1

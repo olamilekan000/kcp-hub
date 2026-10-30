@@ -1,0 +1,30 @@
+# Applied inside kcp, in root:tenancy:tenants, after init has created it.
+#
+# The operator has to know which logical cluster the tenants workspace is,
+# because tenancy's exports address clusters rather than paths. init grants
+# this for the store workspace but not for this one, so without it the
+# operator can only run as a kcp admin. This is the same narrow role init
+# uses for the store: enter the workspace and read where you are.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenancy.platform.kcp.io:tenants-locator
+rules:
+  - nonResourceURLs: ["/"]
+    verbs: ["access"]
+  - apiGroups: ["core.kcp.io"]
+    resources: ["logicalclusters"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tenancy.platform.kcp.io:tenants-locator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tenancy.platform.kcp.io:tenants-locator
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: tenancy-operator

@@ -63,7 +63,7 @@ help: ## Show this help
 		/^##@/ { printf "\n%s\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 	@printf '%s\n' \
 		'' \
-		'make up needs docker, kind, kubectl, helm and curl. Afterwards:' \
+		'make up needs docker, kind, kubectl, helm, curl and git. Afterwards:' \
 		'  export KUBECONFIG=$$PWD/.hub/admin.kubeconfig' \
 		'  kubectl get workspaces' \
 		'' \

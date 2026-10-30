@@ -29,6 +29,15 @@ spec:
       caFileRef:
         name: dex-ca
         key: ca.crt
+  # The virtual workspaces, each at the path it owns. The front-proxy
+  # authenticates the caller and passes their identity on in headers,
+  # signed with its requestheader client certificate.
+  additionalPathMappings:
+    - path: /services/tenancy
+      backend: https://tenancy-virtual-workspace.kcp.svc.cluster.local:6443
+      backend_server_ca: /etc/kcp/tls/ca/tls.crt
+      proxy_client_cert: /etc/kcp-front-proxy/requestheader-client/tls.crt
+      proxy_client_key: /etc/kcp-front-proxy/requestheader-client/tls.key
   deploymentTemplate:
     spec:
       template:

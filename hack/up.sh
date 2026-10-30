@@ -8,6 +8,13 @@ CLUSTER_NAME=${CLUSTER_NAME:-kcp-hub}
 CERT_MANAGER_VERSION=v1.19.2
 ENVOY_GATEWAY_VERSION=v1.7.0
 
+# contrib-virtual-workspaces has not published images for this commit, so
+# they are built from it when they cannot be pulled. The manifests in
+# deploy/local name the same images.
+CONTRIB_REPO=https://github.com/kcp-dev/contrib-virtual-workspaces
+CONTRIB_REF=14476ca92695431da25bfb43762ccadf1d5a954a
+TENANCY_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/tenancy-vw:sha-$CONTRIB_REF
+
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 DEPLOY=$ROOT/deploy/local
 STATE=$ROOT/.hub
@@ -21,7 +28,38 @@ KUBECTL=(kubectl --context "kind-$CLUSTER_NAME")
 
 step() { printf '\n==> %s\n' "$*"; }
 
-for tool in docker kind kubectl helm curl; do
+# Makes a contrib-virtual-workspaces image available in the cluster:
+# pulled if it is published, otherwise built from CONTRIB_REF.
+contrib_image() {
+  local target=$1 image=$2 src=$STATE/src/contrib-virtual-workspaces
+  if docker exec "$CLUSTER_NAME-control-plane" crictl inspecti "$image" >/dev/null 2>&1; then
+    echo "$image is already in the cluster"
+    return
+  fi
+  if ! docker image inspect "$image" >/dev/null 2>&1 && ! docker pull -q "$image" 2>/dev/null; then
+    echo "$image is not published; building it from $CONTRIB_REPO at $CONTRIB_REF"
+    if [ ! -d "$src/.git" ]; then
+      git init -q "$src"
+      git -C "$src" remote add origin "$CONTRIB_REPO"
+    fi
+    git -C "$src" fetch -q --depth 1 origin "$CONTRIB_REF"
+    git -C "$src" checkout -q --detach FETCH_HEAD
+    docker build --target "$target" -t "$image" "$src"
+  fi
+  kind load docker-image "$image" --name "$CLUSTER_NAME"
+}
+
+# Waits for a Deployment that kcp-operator creates, so it may not exist yet.
+wait_deployment() {
+  local name=$1
+  for _ in $(seq 1 60); do
+    "${KUBECTL[@]}" -n kcp get deployment "$name" >/dev/null 2>&1 && break
+    sleep 2
+  done
+  "${KUBECTL[@]}" -n kcp rollout status deployment "$name" --timeout=10m
+}
+
+for tool in docker kind kubectl helm curl git; do
   command -v "$tool" >/dev/null || { echo "$tool is required" >&2; exit 1; }
 done
 
@@ -99,7 +137,7 @@ step "signing in through Dex"
 check_user=admin@platform.example.com
 for _ in $(seq 1 30); do
   if "$ROOT/hack/login.sh" "$check_user" >/dev/null; then
-    token=$(kubectl --kubeconfig "$STATE/${check_user%%@*}.kubeconfig" config view --raw \
+    token=$(kubectl --kubeconfig "$STATE/users/${check_user%%@*}.kubeconfig" config view --raw \
       -o jsonpath='{.users[0].user.token}')
     whoami=$(curl -sk --max-time 5 --resolve kcp.localhost:8443:127.0.0.1 \
       -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
@@ -118,6 +156,28 @@ if [ -z "${signed_in:-}" ]; then
 fi
 echo "kcp accepts Dex tokens ($check_user)"
 
+step "tenancy"
+contrib_image tenancy-vw "$TENANCY_IMAGE"
+"${KUBECTL[@]}" apply -k "$DEPLOY/tenancy"
+"${KUBECTL[@]}" -n kcp wait kubeconfig/tenancy-bootstrap kubeconfig/tenancy-vw kubeconfig/tenancy-operator \
+  --for=condition=Available --timeout=5m
+wait_deployment tenancy-virtual-workspace
+kubectl --kubeconfig "$STATE/admin.kubeconfig" --server https://kcp.localhost:8443/clusters/root:tenancy:tenants \
+  apply -f "$DEPLOY/tenancy/tenants-locator.yaml"
+"${KUBECTL[@]}" -n kcp apply -f "$DEPLOY/tenancy/operator.yaml"
+wait_deployment tenancy-operator
+
+review=$(curl -sk --max-time 10 --resolve kcp.localhost:8443:127.0.0.1 \
+  -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+  -d '{"apiVersion":"tenancy.platform.kcp.io/v1alpha1","kind":"SelfTenancyReview"}' \
+  -o /dev/null -w '%{http_code}' \
+  https://kcp.localhost:8443/services/tenancy/apis/tenancy.platform.kcp.io/v1alpha1/selftenancyreviews || true)
+if [ "$review" != 201 ] && [ "$review" != 200 ]; then
+  echo "the tenancy virtual workspace did not answer on /services/tenancy (HTTP $review)" >&2
+  exit 1
+fi
+echo "tenancy answers at https://kcp.localhost:8443/services/tenancy"
+
 missing=()
 for host in kcp.localhost root.kcp.localhost dex.kcp.localhost; do
   grep -Eq "^[^#]*[[:space:]]$host([[:space:]]|\$)" /etc/hosts || missing+=("$host")
@@ -134,7 +194,7 @@ Dex is the sign-in provider at https://dex.kcp.localhost:8443/dex. To work
 as one of its test users (password "password"):
 
   make login EMAIL=alice@team-a.example.com
-  export KUBECONFIG=$STATE/alice.kubeconfig
+  export KUBECONFIG=$STATE/users/alice.kubeconfig
   kubectl auth whoami
 EOF
 
