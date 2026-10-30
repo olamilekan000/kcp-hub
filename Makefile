@@ -17,6 +17,11 @@ up: ## Create a kind cluster running kcp at https://kcp.localhost:8443
 down: ## Delete the kind cluster and everything in .hub/
 	hack/down.sh
 
+.PHONY: login
+login: ## Sign in as a Dex test user: make login EMAIL=alice@team-a.example.com
+	@test -n "$(EMAIL)" || { echo "usage: make login EMAIL=<test user>" >&2; exit 1; }
+	@hack/login.sh "$(EMAIL)"
+
 ##@ Console
 
 .PHONY: console-dev

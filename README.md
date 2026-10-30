@@ -72,3 +72,27 @@ own `APIExport`, and the operator grants others permission to bind it.
 Consumers browse the catalog through the virtual workspace, then enable an
 API by creating an `APIBinding` in their own workspace. That binding is plain
 kcp: the marketplace never writes into consumer workspaces.
+
+## Running it locally
+
+`make up` creates a kind cluster with kcp at `https://kcp.localhost:8443`
+and Dex, the sign-in provider, at `https://dex.kcp.localhost:8443/dex`.
+`make down` deletes it again. It needs docker, kind, kubectl, helm and curl.
+
+Dex has these test users, all with the password `password`:
+
+| User | Meant for |
+|---|---|
+| `admin@platform.example.com` | the platform admin |
+| `alice@team-a.example.com` | a tenant admin |
+| `bob@team-b.example.com` | a member of someone else's project |
+| `mallory@strangers.example.com` | a random user with no assosicated team |
+
+The roles come once tenancy is installed; for now every user is just
+signed in. To work as one of them:
+
+```sh
+make login EMAIL=alice@team-a.example.com
+export KUBECONFIG=$PWD/.hub/alice.kubeconfig
+kubectl auth whoami
+```

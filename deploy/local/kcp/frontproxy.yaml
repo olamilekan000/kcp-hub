@@ -19,6 +19,16 @@ spec:
   auth:
     serviceAccount:
       enabled: true
+    oidc:
+      issuerURL: https://dex.kcp.localhost:8443/dex
+      clientID: kcp
+      usernameClaim: email
+      groupsClaim: groups
+      # key is documented to default to ca.crt, but the operator does not
+      # apply that default and the front-proxy then fails to start.
+      caFileRef:
+        name: dex-ca
+        key: ca.crt
   deploymentTemplate:
     spec:
       template:
@@ -28,3 +38,4 @@ spec:
               hostnames:
                 - kcp.localhost
                 - root.kcp.localhost
+                - dex.kcp.localhost
