@@ -1,6 +1,7 @@
 extends: default
 
 ignore: |
+  .hub/
   console/node_modules/
   console/dist/
 

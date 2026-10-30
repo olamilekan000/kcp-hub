@@ -1,0 +1,44 @@
+# The tenancy operator turns Tenants, Projects and Memberships into
+# workspaces and RBAC. It is not a kcp admin: it acts through the tenancy
+# exports, which init allows the tenancy-operator user to use.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenancy-operator
+  labels:
+    app: tenancy-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tenancy-operator
+  template:
+    metadata:
+      labels:
+        app: tenancy-operator
+    spec:
+      containers:
+        - name: operator
+          image: ghcr.io/kcp-dev/contrib-virtual-workspaces/tenancy-vw:sha-14476ca92695431da25bfb43762ccadf1d5a954a
+          args:
+            - operator
+            - --kubeconfig=/etc/tenancy/kubeconfig
+            - --workspace-path=root:tenancy:controllers
+            - --tenants-workspace=root:tenancy:tenants
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - name: kubeconfig
+              mountPath: /etc/tenancy
+              readOnly: true
+      volumes:
+        - name: kubeconfig
+          secret:
+            secretName: tenancy-operator-kubeconfig
+      hostAliases:
+        - ip: 10.96.2.2
+          hostnames:
+            - kcp.localhost
+            - root.kcp.localhost

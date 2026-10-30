@@ -75,24 +75,22 @@ kcp: the marketplace never writes into consumer workspaces.
 
 ## Running it locally
 
-`make up` creates a kind cluster with kcp at `https://kcp.localhost:8443`
-and Dex, the sign-in provider, at `https://dex.kcp.localhost:8443/dex`.
-`make down` deletes it again. It needs docker, kind, kubectl, helm and curl.
+`make up` creates a kind cluster with kcp at `https://kcp.localhost:8443`,
+Dex, the sign-in provider, at `https://dex.kcp.localhost:8443/dex`, and
+tenancy at `https://kcp.localhost:8443/services/tenancy`. `make down`
+deletes it again. It needs docker, kind, kubectl, helm, curl and git.
 
 Dex has these test users, all with the password `password`:
 
-| User | Meant for |
-|---|---|
-| `admin@platform.example.com` | the platform admin |
-| `alice@team-a.example.com` | a tenant admin |
-| `bob@team-b.example.com` | a member of someone else's project |
-| `mallory@strangers.example.com` | a random user with no assosicated team |
+- `admin@platform.example.com`, the platform admin, who can create tenants
+- `alice@team-a.example.com`, `bob@team-b.example.com` and
+  `mallory@strangers.example.com`, who start out in no tenant
 
-The roles come once tenancy is installed; for now every user is just
-signed in. To work as one of them:
+Self-service is on, so any signed-in user can request a tenant of their
+own and then projects in it. To work as one of them:
 
 ```sh
 make login EMAIL=alice@team-a.example.com
-export KUBECONFIG=$PWD/.hub/alice.kubeconfig
+export KUBECONFIG=$PWD/.hub/users/alice.kubeconfig
 kubectl auth whoami
 ```
