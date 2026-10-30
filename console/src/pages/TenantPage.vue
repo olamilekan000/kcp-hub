@@ -14,6 +14,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import RoleBadge from '@/components/RoleBadge.vue'
+import Spinner from '@/components/Spinner.vue'
 
 const session = useSession()
 const route = useRoute()
@@ -93,6 +94,7 @@ watch(name, () => {
           @keyup.escape="showForm = false"
         />
         <button class="k-btn k-btn--primary" :disabled="creating || !newName.trim()" @click="create">
+          <Spinner v-if="creating" />
           {{ creating ? 'Creating…' : 'Create' }}
         </button>
         <button class="k-btn k-btn--ghost" @click="showForm = false">Cancel</button>

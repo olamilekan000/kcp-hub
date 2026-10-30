@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import * as oidc from '@/lib/oidc'
+import Spinner from '@/components/Spinner.vue'
 
 const route = useRoute()
 const error = ref('')
@@ -43,6 +44,7 @@ async function signIn() {
       </p>
 
       <button class="k-btn k-btn--primary mt-7 w-full !py-2" :disabled="busy || !issuer" @click="signIn">
+        <Spinner v-if="busy" />
         {{ busy ? 'Redirecting…' : 'Sign in' }}
       </button>
 

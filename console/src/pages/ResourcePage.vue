@@ -31,6 +31,7 @@ import {
 import PageHeader from '@/components/PageHeader.vue'
 import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
+import Spinner from '@/components/Spinner.vue'
 import ObjectEditor from '@/components/ObjectEditor.vue'
 
 const route = useRoute()
@@ -205,8 +206,12 @@ async function save(object: Record<string, unknown>) {
   }
 }
 
+function nameOfRow(row: TableRow): string {
+  return row.object ? nameOf(row.object) : ''
+}
+
 async function remove(row: TableRow) {
-  const name = row.object ? nameOf(row.object) : ''
+  const name = nameOfRow(row)
   if (!name) return
   busy.value = name
   note.value = ''
@@ -297,6 +302,7 @@ watch([workspace, resource, group], () => {
           :disabled="busy === 'skeleton'"
           @click="startCreate"
         >
+          <Spinner v-if="busy === 'skeleton'" />
           New {{ meta?.kind || resource }}
         </button>
       </template>
@@ -401,7 +407,8 @@ watch([workspace, resource, group], () => {
         </p>
         <div class="px-4 py-2.5 border-t border-edge flex gap-2">
           <button class="k-btn k-btn--danger" :disabled="!!busy" @click="remove(confirming)">
-            Delete
+            <Spinner v-if="busy && busy === nameOfRow(confirming)" />
+            {{ busy && busy === nameOfRow(confirming) ? 'Deleting…' : 'Delete' }}
           </button>
           <button class="k-btn k-btn--ghost" @click="confirming = null">Cancel</button>
         </div>

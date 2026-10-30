@@ -13,6 +13,7 @@ import { computed, ref, watch } from 'vue'
 import { parse, stringify } from 'yaml'
 import type { OpenAPISchema } from '@/lib/api'
 import { setValueAt, shapeOf, valueAt, type FormField } from '@/lib/form'
+import Spinner from '@/components/Spinner.vue'
 
 const props = defineProps<{
   /** The object to edit; changing it reloads the buffers. */
@@ -251,6 +252,7 @@ function save() {
 
     <div class="px-4 py-2.5 border-t border-edge flex items-center gap-2">
       <button class="k-btn k-btn--primary" :disabled="busy" @click="save">
+        <Spinner v-if="busy" />
         {{ busy ? 'Applying…' : 'Apply' }}
       </button>
       <button class="k-btn k-btn--ghost" :disabled="busy" @click="emit('cancel')">Cancel</button>

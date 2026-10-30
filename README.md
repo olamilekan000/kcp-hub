@@ -97,8 +97,20 @@ kcp: the marketplace never writes into consumer workspaces.
 and Dex, the sign-in provider, at `https://dex.kcp.localhost:8443/dex`.
 Tenancy and the marketplace are served by kcp at
 `https://kcp.localhost:8443/services/tenancy` and
-`https://kcp.localhost:8443/services/marketplace`. `make down` deletes it
-all again. It needs docker, kind, kubectl, helm, curl and git.
+`https://kcp.localhost:8443/services/marketplace`, and the console at
+`https://console.kcp.localhost:8443`. `make down` deletes it all again. It
+needs docker, kind, kubectl, helm, curl and git.
+
+The console's and Dex's certificates come from a local CA, written to
+`.hub/ca.crt`. Trust it once so the browser accepts both. On macOS:
+
+```sh
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain .hub/ca.crt
+```
+
+Otherwise, open Dex's address and accept the warning before signing in to
+the console. The console calls Dex from the page, where the browser cannot
+ask.
 
 Dex has these test users, all with the password `password`:
 

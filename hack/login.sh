@@ -15,7 +15,7 @@ PASSWORD=${2:-password}
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 STATE=$ROOT/.hub
-CA=$STATE/dex-ca.crt
+CA=$STATE/ca.crt
 ADMIN=$STATE/admin.kubeconfig
 
 for file in "$CA" "$ADMIN"; do

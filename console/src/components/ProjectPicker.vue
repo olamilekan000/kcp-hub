@@ -11,6 +11,7 @@
 // the first project to be made.
 import { computed } from 'vue'
 import { useSession } from '@/stores/session'
+import Spinner from '@/components/Spinner.vue'
 
 const session = useSession()
 
@@ -48,7 +49,11 @@ const value = computed({
   </div>
   <!-- Nothing to pick yet: point at the thing that fixes that, not at a
        list that would also be empty. -->
-  <RouterLink v-else-if="!session.loading" to="/welcome" class="text-xs text-muted hover:text-ink">
+  <span v-else-if="session.loading" class="text-xs text-faint flex items-center gap-1.5" role="status">
+    <Spinner :size="12" />
+    Loading projects…
+  </span>
+  <RouterLink v-else to="/welcome" class="text-xs text-muted hover:text-ink">
     Get started →
   </RouterLink>
 </template>

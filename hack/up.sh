@@ -16,6 +16,10 @@ CONTRIB_REF=14476ca92695431da25bfb43762ccadf1d5a954a
 TENANCY_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/tenancy-vw:sha-$CONTRIB_REF
 MARKETPLACE_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/marketplace-vw:sha-$CONTRIB_REF
 
+# The console is built from console/ unless CONSOLE_IMAGE names a published
+# one, such as ghcr.io/olamilekan000/kcp-hub/console:main.
+CONSOLE_IMAGE=${CONSOLE_IMAGE:-}
+
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 DEPLOY=$ROOT/deploy/local
 STATE=$ROOT/.hub
@@ -48,6 +52,22 @@ contrib_image() {
     docker build --target "$target" -t "$image" "$src"
   fi
   kind load docker-image "$image" --name "$CLUSTER_NAME"
+}
+
+# Dex and the console read their certificate, and Dex its config, once at
+# startup. Recording a checksum of them on the pod template restarts the
+# Deployment when they change, and does nothing when they have not.
+restart_on_change() {
+  local namespace=$1 deployment=$2 secret=$3 configmap=${4:-} extra=${5:-} sum
+  sum=$({
+    "${KUBECTL[@]}" -n "$namespace" get secret "$secret" -o jsonpath='{.data.tls\.crt}'
+    if [ -n "$configmap" ]; then
+      "${KUBECTL[@]}" -n "$namespace" get configmap "$configmap" -o jsonpath='{.data}'
+    fi
+    echo "$extra"
+  } | shasum | cut -c1-16)
+  "${KUBECTL[@]}" -n "$namespace" patch deployment "$deployment" --type=merge \
+    -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"hub.kcp.io/inputs\":\"$sum\"}}}}}"
 }
 
 # Runs kubectl as the kcp admin in one kcp workspace.
@@ -108,15 +128,20 @@ step "kcp-operator"
 "${KUBECTL[@]}" wait crd/rootshards.operator.kcp.io --for=condition=Established --timeout=2m
 "${KUBECTL[@]}" -n kcp-operator-system rollout status deployment --timeout=5m
 
+step "local CA"
+"${KUBECTL[@]}" apply -k "$DEPLOY/ca"
+"${KUBECTL[@]}" -n cert-manager wait certificate/hub-ca --for=condition=Ready --timeout=2m
+"${KUBECTL[@]}" -n cert-manager get secret hub-ca -o jsonpath='{.data.ca\.crt}' | base64 -d >"$STATE/ca.crt"
+# kcp and the virtual workspaces read the CA from the kcp namespace, and
+# have to find it before their pods start.
+"${KUBECTL[@]}" create namespace kcp --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f -
+"${KUBECTL[@]}" -n kcp create secret generic hub-ca --from-file=ca.crt="$STATE/ca.crt" \
+  --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f -
+
 step "Dex"
 "${KUBECTL[@]}" apply -k "$DEPLOY/dex"
-"${KUBECTL[@]}" -n dex wait certificate/dex-ca certificate/dex-tls --for=condition=Ready --timeout=2m
-"${KUBECTL[@]}" -n dex get secret dex-ca -o jsonpath='{.data.ca\.crt}' | base64 -d >"$STATE/dex-ca.crt"
-# kcp reads the CA from its own namespace, and has to find it before its
-# pods start.
-"${KUBECTL[@]}" create namespace kcp --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f -
-"${KUBECTL[@]}" -n kcp create secret generic dex-ca --from-file=ca.crt="$STATE/dex-ca.crt" \
-  --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f -
+"${KUBECTL[@]}" -n dex wait certificate/dex-tls --for=condition=Ready --timeout=2m
+restart_on_change dex dex dex-tls dex
 "${KUBECTL[@]}" -n dex rollout status deployment/dex --timeout=5m
 
 step "kcp"
@@ -227,8 +252,43 @@ if [ -z "${listed:-}" ]; then
 fi
 echo "the catalog at https://kcp.localhost:8443/services/marketplace lists widgets.acme.example"
 
+step "console"
+console_image=${CONSOLE_IMAGE:-kcp-hub/console:dev}
+if [ -n "$CONSOLE_IMAGE" ]; then
+  docker pull "$console_image"
+else
+  docker build -t "$console_image" "$ROOT/console"
+fi
+# Loaded rather than pulled by the cluster, so a moved tag such as :main
+# reaches it too, through the image ID below.
+kind load docker-image "$console_image" --name "$CLUSTER_NAME"
+"${KUBECTL[@]}" kustomize "$DEPLOY/console" \
+  | sed "s|image: kcp-hub/console:dev|image: $console_image|" \
+  | "${KUBECTL[@]}" apply -f -
+"${KUBECTL[@]}" -n kcp wait certificate/console-tls --for=condition=Ready --timeout=2m
+restart_on_change kcp console console-tls "" "$(docker image inspect -f '{{.Id}}' "$console_image")"
+"${KUBECTL[@]}" -n kcp rollout status deployment/console --timeout=5m
+
+# Through the console, so this checks its certificate and its route to kcp.
+for _ in $(seq 1 30); do
+  via_console=$(curl -s --max-time 10 --cacert "$STATE/ca.crt" --resolve console.kcp.localhost:8443:127.0.0.1 \
+    -H "Authorization: Bearer $token" \
+    https://console.kcp.localhost:8443/services/marketplace/apis/marketplace.platform.kcp.io/v1alpha1/offerings \
+    || true)
+  if printf '%s' "$via_console" | grep -q widgets.acme.example; then
+    console_ok=1
+    break
+  fi
+  sleep 2
+done
+if [ -z "${console_ok:-}" ]; then
+  echo "the console at https://console.kcp.localhost:8443 did not reach kcp; last answer: ${via_console:-none}" >&2
+  exit 1
+fi
+echo "the console at https://console.kcp.localhost:8443 reaches kcp"
+
 missing=()
-for host in kcp.localhost root.kcp.localhost dex.kcp.localhost; do
+for host in kcp.localhost root.kcp.localhost dex.kcp.localhost console.kcp.localhost; do
   grep -Eq "^[^#]*[[:space:]]$host([[:space:]]|\$)" /etc/hosts || missing+=("$host")
 done
 
@@ -238,6 +298,10 @@ kcp is up at https://kcp.localhost:8443
 
   export KUBECONFIG=$STATE/admin.kubeconfig
   kubectl get workspaces
+
+The console is at https://console.kcp.localhost:8443. Its certificate and
+Dex's come from a local CA; trust $STATE/ca.crt in your browser or
+system, or accept the warnings on both sites once.
 
 Dex is the sign-in provider at https://dex.kcp.localhost:8443/dex. To work
 as one of its test users (password "password"):

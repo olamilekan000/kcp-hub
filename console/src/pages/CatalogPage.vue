@@ -17,6 +17,7 @@ import {
 import PageHeader from '@/components/PageHeader.vue'
 import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
+import Spinner from '@/components/Spinner.vue'
 
 const session = useSession()
 
@@ -75,6 +76,18 @@ function stateOf(offer: CatalogOffering): State {
   return binding.status?.phase === 'Bound' ? 'enabled' : 'pending'
 }
 
+// kcp binds a new APIBinding, and finishes deleting one, a moment after the
+// request returns, so the first read usually finds it in between. Keep
+// reading the bindings, and only them, for a while so the entry settles
+// without a reload.
+async function until(settled: () => boolean) {
+  const ws = workspace.value
+  for (let i = 0; i < 20 && ws && ws === workspace.value && !settled(); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    bound.value = (await bindings(ws)).items ?? []
+  }
+}
+
 async function enable(offer: CatalogOffering) {
   if (!workspace.value || !offer.export || !offer.workspacePath) return
   busy.value = offer.metadata.name
@@ -86,6 +99,7 @@ async function enable(offer: CatalogOffering) {
     enabledNow.value = offer.offering
     // Re-read, so the entry stops offering to do it again.
     await load()
+    await until(() => stateOf(offer) !== 'pending')
   } catch (e) {
     noteError.value = true
     note.value =
@@ -122,6 +136,7 @@ async function disable(offer: CatalogOffering) {
     note.value = `Disabled ${offer.metadata.name} in ${session.tenant}/${session.project}.`
     confirming.value = null
     await load()
+    await until(() => !bindingFor(offer))
   } catch (e) {
     noteError.value = true
     note.value =
@@ -220,6 +235,7 @@ watch(workspace, load)
                 :disabled="busy === o.metadata.name"
                 @click="confirming = o"
               >
+                <Spinner v-if="busy === o.metadata.name" :size="12" />
                 {{ busy === o.metadata.name ? 'Disabling…' : 'Disable' }}
               </button>
             </div>
@@ -228,6 +244,7 @@ watch(workspace, load)
               class="k-badge k-badge--muted ml-auto shrink-0"
               title="the binding exists; kcp is still establishing the API"
             >
+              <Spinner :size="10" />
               Enabling…
             </span>
             <button
@@ -237,6 +254,7 @@ watch(workspace, load)
               :title="workspace ? '' : 'Select a project'"
               @click="enable(o)"
             >
+              <Spinner v-if="busy === o.metadata.name" :size="12" />
               {{ busy === o.metadata.name ? 'Enabling…' : 'Enable' }}
             </button>
           </div>

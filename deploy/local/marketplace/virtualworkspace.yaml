@@ -47,11 +47,11 @@ spec:
     - --oidc-groups-claim=groups
     - --oidc-ca-file=/etc/dex/ca.crt
   extraVolumes:
-    - name: dex-ca
+    - name: hub-ca
       secret:
-        secretName: dex-ca
+        secretName: hub-ca
   extraVolumeMounts:
-    - name: dex-ca
+    - name: hub-ca
       mountPath: /etc/dex
       readOnly: true
   deploymentTemplate:

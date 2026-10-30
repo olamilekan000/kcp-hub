@@ -34,16 +34,22 @@ const listable = ref(true)
 const loadingGroups = ref(false)
 const loadingKinds = ref(false)
 const loadingObjects = ref(false)
+// One per panel, so a failure shows where it happened rather than as an
+// empty list.
+const groupsError = ref('')
+const kindsError = ref('')
 const error = ref('')
 
 async function loadGroups() {
   groupVersions.value = []
   kinds.value = []
   rows.value = []
+  groupsError.value = ''
+  kindsError.value = ''
+  error.value = ''
   if (!workspace.value) return
 
   loadingGroups.value = true
-  error.value = ''
   try {
     const gs = await groups(workspace.value)
     // v1 is always served and is not in /apis; it is what people look for first.
@@ -51,7 +57,7 @@ async function loadGroups() {
     groupVersion.value = groupVersions.value[0] ?? ''
     await loadKinds()
   } catch (e) {
-    error.value = describe(e)
+    groupsError.value = describe(e)
   } finally {
     loadingGroups.value = false
   }
@@ -61,13 +67,15 @@ async function loadKinds() {
   kinds.value = []
   rows.value = []
   kind.value = ''
+  kindsError.value = ''
+  error.value = ''
   if (!workspace.value || !groupVersion.value) return
 
   loadingKinds.value = true
   try {
     kinds.value = await resources(workspace.value, groupVersion.value)
   } catch (e) {
-    error.value = describe(e)
+    kindsError.value = describe(e)
   } finally {
     loadingKinds.value = false
   }
@@ -140,14 +148,32 @@ watch(groupVersion, loadKinds)
       </template>
     </PageHeader>
 
-    <div v-if="!workspace" class="k-card px-4 py-6 text-xs text-muted">
-      No project selected.
+    <!-- Everything here is served inside a project, so with none there is
+         nothing to browse. Being a platform admin does not change that:
+         it is a right to create tenants, not membership of one. -->
+    <div v-if="!workspace && (session.loading || session.error)" class="k-card">
+      <StateBlock :loading="session.loading" :error="session.error" />
+    </div>
+    <div v-else-if="!workspace" class="k-card px-4 py-6 text-xs text-muted space-y-2">
+      <template v-if="!session.projects.length">
+        <p>
+          You are not in any project yet, so there is nothing to browse: the explorer shows the APIs
+          served inside a project, such as the ones enabled from Producers.
+        </p>
+        <RouterLink to="/welcome" class="text-accent hover:underline">Create a tenant and a project →</RouterLink>
+      </template>
+      <p v-else>Pick a project at the top to browse the APIs it serves.</p>
     </div>
 
     <div v-else class="grid gap-4 lg:grid-cols-[13rem_15rem_1fr]">
       <Panel>
         <template #header>Group / version</template>
-        <StateBlock :loading="loadingGroups" :empty="!groupVersions.length" empty-text="Nothing served.">
+        <StateBlock
+          :loading="loadingGroups"
+          :error="groupsError"
+          :empty="!groupVersions.length"
+          empty-text="Nothing served."
+        >
           <ul class="max-h-[28rem] overflow-auto p-1">
             <li
               v-for="gv in groupVersions"
@@ -164,7 +190,12 @@ watch(groupVersion, loadKinds)
 
       <Panel>
         <template #header>Kinds</template>
-        <StateBlock :loading="loadingKinds" :empty="!kinds.length" empty-text="No resources.">
+        <StateBlock
+          :loading="loadingKinds || loadingGroups"
+          :error="kindsError"
+          :empty="!kinds.length"
+          :empty-text="groupsError ? 'Nothing to show.' : 'No resources.'"
+        >
           <ul class="max-h-[28rem] overflow-auto p-1">
             <li
               v-for="r in kinds"
