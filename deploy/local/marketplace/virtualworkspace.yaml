@@ -1,0 +1,66 @@
+# The marketplace virtual workspace, which the front-proxy serves at
+# /services/marketplace. kcp-operator runs it as a Deployment and Service
+# named marketplace-virtual-workspace. Its init container sets the
+# marketplace up in kcp before the server starts.
+apiVersion: operator.kcp.io/v1alpha1
+kind: VirtualWorkspace
+metadata:
+  name: marketplace
+spec:
+  target:
+    rootShardRef:
+      name: root
+  external:
+    hostname: kcp.localhost
+    port: 8443
+  # Keep in step with the operator Deployment and MARKETPLACE_IMAGE in
+  # hack/up.sh.
+  image:
+    repository: ghcr.io/kcp-dev/contrib-virtual-workspaces/marketplace-vw
+    tag: sha-14476ca92695431da25bfb43762ccadf1d5a954a
+  # The operator's default is two replicas requesting a CPU each, which a
+  # one-node kind cluster cannot spare.
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  command: ["/marketplace-vw", "virtualworkspace"]
+  kubeconfigSecretRef:
+    name: marketplace-vw-kubeconfig
+  initContainers:
+    - name: init
+      command: ["/marketplace-vw", "init"]
+      kubeconfigSecretRef:
+        name: marketplace-bootstrap-kubeconfig
+      args:
+        - --kubeconfig=/etc/kcp/init-kubeconfig/kubeconfig
+        - --server-user=marketplace-vw
+        - --server-user=marketplace-operator
+        - --platform-admin-user=admin@platform.example.com
+  extraArgs:
+    # Must match kcp's OIDC settings, so a token names the same user here
+    # as it does in kcp.
+    - --oidc-issuer-url=https://dex.kcp.localhost:8443/dex
+    - --oidc-client-id=kcp
+    - --oidc-username-claim=email
+    - --oidc-groups-claim=groups
+    - --oidc-ca-file=/etc/dex/ca.crt
+  extraVolumes:
+    - name: dex-ca
+      secret:
+        secretName: dex-ca
+  extraVolumeMounts:
+    - name: dex-ca
+      mountPath: /etc/dex
+      readOnly: true
+  deploymentTemplate:
+    spec:
+      template:
+        spec:
+          hostAliases:
+            - ip: 10.96.2.2
+              hostnames:
+                - kcp.localhost
+                - root.kcp.localhost
+                - dex.kcp.localhost

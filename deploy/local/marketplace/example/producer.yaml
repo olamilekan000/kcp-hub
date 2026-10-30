@@ -1,0 +1,13 @@
+# An example producer, so the catalog is not empty on first start. Applied
+# in the catalog workspace, root:marketplace:catalog.
+#
+# provisioned: the marketplace operator creates the producer's workspace,
+# where widgets.yaml then publishes an API.
+apiVersion: marketplace.platform.kcp.io/v1alpha1
+kind: Producer
+metadata:
+  name: acme
+spec:
+  displayName: Acme
+  description: Example producer that ships with kcp hub.
+  mode: provisioned

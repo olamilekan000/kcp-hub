@@ -14,6 +14,7 @@ ENVOY_GATEWAY_VERSION=v1.7.0
 CONTRIB_REPO=https://github.com/kcp-dev/contrib-virtual-workspaces
 CONTRIB_REF=14476ca92695431da25bfb43762ccadf1d5a954a
 TENANCY_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/tenancy-vw:sha-$CONTRIB_REF
+MARKETPLACE_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/marketplace-vw:sha-$CONTRIB_REF
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 DEPLOY=$ROOT/deploy/local
@@ -47,6 +48,13 @@ contrib_image() {
     docker build --target "$target" -t "$image" "$src"
   fi
   kind load docker-image "$image" --name "$CLUSTER_NAME"
+}
+
+# Runs kubectl as the kcp admin in one kcp workspace.
+in_workspace() {
+  local ws=$1
+  shift
+  kubectl --kubeconfig "$STATE/admin.kubeconfig" --server "https://kcp.localhost:8443/clusters/$ws" "$@"
 }
 
 # Waits for a Deployment that kcp-operator creates, so it may not exist yet.
@@ -162,8 +170,7 @@ contrib_image tenancy-vw "$TENANCY_IMAGE"
 "${KUBECTL[@]}" -n kcp wait kubeconfig/tenancy-bootstrap kubeconfig/tenancy-vw kubeconfig/tenancy-operator \
   --for=condition=Available --timeout=5m
 wait_deployment tenancy-virtual-workspace
-kubectl --kubeconfig "$STATE/admin.kubeconfig" --server https://kcp.localhost:8443/clusters/root:tenancy:tenants \
-  apply -f "$DEPLOY/tenancy/tenants-locator.yaml"
+in_workspace root:tenancy:tenants apply -f "$DEPLOY/tenancy/tenants-locator.yaml"
 "${KUBECTL[@]}" -n kcp apply -f "$DEPLOY/tenancy/operator.yaml"
 wait_deployment tenancy-operator
 
@@ -177,6 +184,48 @@ if [ "$review" != 201 ] && [ "$review" != 200 ]; then
   exit 1
 fi
 echo "tenancy answers at https://kcp.localhost:8443/services/tenancy"
+
+step "marketplace"
+contrib_image marketplace-vw "$MARKETPLACE_IMAGE"
+"${KUBECTL[@]}" apply -k "$DEPLOY/marketplace"
+"${KUBECTL[@]}" -n kcp wait kubeconfig/marketplace-bootstrap kubeconfig/marketplace-vw \
+  kubeconfig/marketplace-operator --for=condition=Available --timeout=5m
+wait_deployment marketplace-virtual-workspace
+for ws in root:marketplace:catalog root:marketplace:producers; do
+  in_workspace "$ws" apply -f "$DEPLOY/marketplace/locator.yaml"
+done
+"${KUBECTL[@]}" -n kcp apply -f "$DEPLOY/marketplace/operator.yaml"
+wait_deployment marketplace-operator
+
+echo "publishing the example producer"
+in_workspace root:marketplace:catalog apply -f "$DEPLOY/marketplace/example/producer.yaml"
+for _ in $(seq 1 60); do
+  producer_ws=$(in_workspace root:marketplace:catalog get producer acme \
+    -o jsonpath='{.status.workspacePath}' 2>/dev/null || true)
+  [ -n "$producer_ws" ] && break
+  sleep 2
+done
+if [ -z "$producer_ws" ]; then
+  echo "the marketplace operator did not create a workspace for the example producer" >&2
+  exit 1
+fi
+in_workspace "$producer_ws" apply -f "$DEPLOY/marketplace/example/widgets.yaml"
+
+for _ in $(seq 1 60); do
+  offerings=$(curl -sk --max-time 10 --resolve kcp.localhost:8443:127.0.0.1 \
+    -H "Authorization: Bearer $token" \
+    https://kcp.localhost:8443/services/marketplace/apis/marketplace.platform.kcp.io/v1alpha1/offerings || true)
+  if printf '%s' "$offerings" | grep -q widgets.acme.example; then
+    listed=1
+    break
+  fi
+  sleep 2
+done
+if [ -z "${listed:-}" ]; then
+  echo "the example API did not show up in the catalog; last answer: ${offerings:-none}" >&2
+  exit 1
+fi
+echo "the catalog at https://kcp.localhost:8443/services/marketplace lists widgets.acme.example"
 
 missing=()
 for host in kcp.localhost root.kcp.localhost dex.kcp.localhost; do

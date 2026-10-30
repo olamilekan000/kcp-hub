@@ -1,0 +1,12 @@
+# The marketplace, from the marketplace-vw image of
+# contrib-virtual-workspaces: the virtual workspace, whose init container
+# sets the marketplace up in kcp. The front-proxy route to it is in
+# deploy/local/kcp/frontproxy.yaml.
+#
+# hack/up.sh applies operator.yaml separately, once init has run and
+# locator.yaml is in place, because the operator cannot start before then.
+# example/ is applied inside kcp, also by hack/up.sh.
+namespace: kcp
+resources:
+  - kubeconfigs.yaml
+  - virtualworkspace.yaml

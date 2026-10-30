@@ -1,0 +1,53 @@
+# The example producer's one API, applied in its workspace. The annotation
+# on the APIExport is what publishes it to the catalog. It asks for no
+# access to the consumer's workspace, so enabling it is a plain APIBinding.
+apiVersion: apis.kcp.io/v1alpha1
+kind: APIResourceSchema
+metadata:
+  name: v1alpha1.widgets.acme.example
+spec:
+  group: acme.example
+  names:
+    kind: Widget
+    listKind: WidgetList
+    plural: widgets
+    singular: widget
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: Size
+          type: string
+          jsonPath: .spec.size
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        type: object
+        properties:
+          apiVersion: {type: string}
+          kind: {type: string}
+          metadata: {type: object}
+          spec:
+            type: object
+            properties:
+              size: {type: string}
+---
+apiVersion: apis.kcp.io/v1alpha2
+kind: APIExport
+metadata:
+  name: widgets.acme.example
+  annotations:
+    # Only the exact string "true" publishes.
+    marketplace.kcp.hub/publish: "true"
+    marketplace.kcp.hub/display-name: Widgets
+    marketplace.kcp.hub/description: A widget kind, and nothing else.
+spec:
+  resources:
+    - name: widgets
+      group: acme.example
+      schema: v1alpha1.widgets.acme.example
+      storage:
+        crd: {}
