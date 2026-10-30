@@ -62,6 +62,17 @@ step "kcp-operator"
 "${KUBECTL[@]}" wait crd/rootshards.operator.kcp.io --for=condition=Established --timeout=2m
 "${KUBECTL[@]}" -n kcp-operator-system rollout status deployment --timeout=5m
 
+step "Dex"
+"${KUBECTL[@]}" apply -k "$DEPLOY/dex"
+"${KUBECTL[@]}" -n dex wait certificate/dex-ca certificate/dex-tls --for=condition=Ready --timeout=2m
+"${KUBECTL[@]}" -n dex get secret dex-ca -o jsonpath='{.data.ca\.crt}' | base64 -d >"$STATE/dex-ca.crt"
+# kcp reads the CA from its own namespace, and has to find it before its
+# pods start.
+"${KUBECTL[@]}" create namespace kcp --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f -
+"${KUBECTL[@]}" -n kcp create secret generic dex-ca --from-file=ca.crt="$STATE/dex-ca.crt" \
+  --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f -
+"${KUBECTL[@]}" -n dex rollout status deployment/dex --timeout=5m
+
 step "kcp"
 "${KUBECTL[@]}" apply -k "$DEPLOY/kcp"
 "${KUBECTL[@]}" -n kcp wait kubeconfig/admin --for=condition=Available --timeout=10m
@@ -82,8 +93,33 @@ if [ -z "${ready:-}" ]; then
   exit 1
 fi
 
+step "signing in through Dex"
+# Retried, because on an existing cluster kcp may still be rolling out with
+# the new authentication settings.
+check_user=admin@platform.example.com
+for _ in $(seq 1 30); do
+  if "$ROOT/hack/login.sh" "$check_user" >/dev/null; then
+    token=$(kubectl --kubeconfig "$STATE/${check_user%%@*}.kubeconfig" config view --raw \
+      -o jsonpath='{.users[0].user.token}')
+    whoami=$(curl -sk --max-time 5 --resolve kcp.localhost:8443:127.0.0.1 \
+      -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+      -d '{"apiVersion":"authentication.k8s.io/v1","kind":"SelfSubjectReview"}' \
+      https://kcp.localhost:8443/clusters/root/apis/authentication.k8s.io/v1/selfsubjectreviews || true)
+    if printf '%s' "$whoami" | grep -q "\"username\": *\"$check_user\""; then
+      signed_in=1
+      break
+    fi
+  fi
+  sleep 5
+done
+if [ -z "${signed_in:-}" ]; then
+  echo "kcp did not accept a Dex token for $check_user; last answer: ${whoami:-none}" >&2
+  exit 1
+fi
+echo "kcp accepts Dex tokens ($check_user)"
+
 missing=()
-for host in kcp.localhost root.kcp.localhost; do
+for host in kcp.localhost root.kcp.localhost dex.kcp.localhost; do
   grep -Eq "^[^#]*[[:space:]]$host([[:space:]]|\$)" /etc/hosts || missing+=("$host")
 done
 
@@ -93,6 +129,13 @@ kcp is up at https://kcp.localhost:8443
 
   export KUBECONFIG=$STATE/admin.kubeconfig
   kubectl get workspaces
+
+Dex is the sign-in provider at https://dex.kcp.localhost:8443/dex. To work
+as one of its test users (password "password"):
+
+  make login EMAIL=alice@team-a.example.com
+  export KUBECONFIG=$STATE/alice.kubeconfig
+  kubectl auth whoami
 EOF
 
 if [ ${#missing[@]} -gt 0 ]; then

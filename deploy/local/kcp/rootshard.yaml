@@ -28,11 +28,23 @@ spec:
   auth:
     serviceAccount:
       enabled: true
+    # Must match the front-proxy's, so a token names the same user on both.
+    oidc:
+      issuerURL: https://dex.kcp.localhost:8443/dex
+      clientID: kcp
+      usernameClaim: email
+      groupsClaim: groups
+      # key is documented to default to ca.crt, but the operator does not
+      # apply that default and kcp then fails to start.
+      caFileRef:
+        name: dex-ca
+        key: ca.crt
   extraArgs:
     - --feature-gates=CacheAPIs=true,WorkspaceMounts=true
     - --etcd-prefix=/shard/root
-  # kcp calls itself on its external hostnames, so inside the cluster they
-  # have to resolve to the gateway too.
+  # kcp calls itself on its external hostnames and fetches Dex's keys from
+  # the issuer URL, so inside the cluster these names have to resolve to
+  # the gateway too.
   deploymentTemplate:
     spec:
       template:
@@ -42,6 +54,7 @@ spec:
               hostnames:
                 - kcp.localhost
                 - root.kcp.localhost
+                - dex.kcp.localhost
   proxy:
     image:
       tag: main
@@ -54,3 +67,4 @@ spec:
                 hostnames:
                   - kcp.localhost
                   - root.kcp.localhost
+                  - dex.kcp.localhost

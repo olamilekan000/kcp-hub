@@ -1,0 +1,7 @@
+# Dex, the OIDC issuer kcp trusts in the local environment, with static
+# test users. See the README for who they are.
+namespace: dex
+resources:
+  - namespace.yaml
+  - certificates.yaml
+  - dex.yaml

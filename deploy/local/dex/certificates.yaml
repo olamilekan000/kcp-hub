@@ -1,0 +1,46 @@
+# Dex serves its own TLS. Its certificate comes from a CA of its own rather
+# than being self-signed, so a renewal changes the certificate but not what
+# kcp has to trust: kcp keeps a copy of the CA (secret dex-ca in the kcp
+# namespace, written by hack/up.sh) and that copy stays valid.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: dex-ca
+spec:
+  isCA: true
+  commonName: kcp hub dex CA
+  secretName: dex-ca
+  duration: 87600h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned
+    kind: Issuer
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: dex-ca
+spec:
+  ca:
+    secretName: dex-ca
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: dex-tls
+spec:
+  secretName: dex-tls
+  dnsNames:
+    - dex.kcp.localhost
+  issuerRef:
+    name: dex-ca
+    kind: Issuer
