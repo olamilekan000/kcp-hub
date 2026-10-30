@@ -33,6 +33,8 @@ import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import Spinner from '@/components/Spinner.vue'
 import ObjectEditor from '@/components/ObjectEditor.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import Modal from '@/components/Modal.vue'
 
 const route = useRoute()
 const session = useSession()
@@ -54,7 +56,7 @@ const loading = ref(false)
 const error = ref('')
 const wide = ref(false)
 
-/** '' is the list on its own; the rest open the side panel. */
+/** '' is the list on its own; the rest open a dialog over it. */
 const mode = ref<'' | 'create' | 'edit' | 'view'>('')
 const subject = ref<Record<string, unknown> | null>(null)
 const selected = ref<TableRow | null>(null)
@@ -158,20 +160,8 @@ async function startCreate() {
   }
 }
 
-/**
- * Picking a row opens it in the side panel — to edit if you may, to read
- * if not.
- *
- * A create in progress is left alone: its YAML was typed and exists
- * nowhere else, whereas switching between existing objects only loses
- * edits that can be re-read from the server.
- */
+/** Picking a row opens it in a dialog: to edit if you may, to read if not. */
 function pick(row: TableRow) {
-  if (mode.value === 'create') return
-  if (selected.value === row) {
-    close()
-    return
-  }
   selected.value = row
   subject.value = row.object ?? null
   mode.value = row.object && can('update') ? 'edit' : 'view'
@@ -229,6 +219,7 @@ async function remove(row: TableRow) {
     if (selected.value === row) close()
     await load()
   } catch (e) {
+    confirming.value = null
     noteError.value = true
     note.value = describe(e)
   } finally {
@@ -318,9 +309,7 @@ watch([workspace, resource, group], () => {
       <span class="text-[11px] text-faint">used when the object names none</span>
     </div>
 
-    <!-- Left: the list, always. Right: whatever is being looked at. -->
-    <div class="grid gap-4 items-start" :class="mode && 'xl:grid-cols-[minmax(0,1fr)_32rem]'">
-      <Panel>
+    <Panel>
         <StateBlock
           :loading="loading"
           :error="error"
@@ -338,7 +327,7 @@ watch([workspace, resource, group], () => {
               <tr
                 v-for="(row, i) in rows"
                 :key="i"
-                :class="[mode !== 'create' && 'is-interactive', selected === row && 'is-selected']"
+                class="is-interactive"
                 @click="pick(row)"
               >
                 <td
@@ -361,58 +350,44 @@ watch([workspace, resource, group], () => {
             </tbody>
           </table>
         </StateBlock>
+    </Panel>
+
+    <!-- A form with typed input does not close on a stray backdrop click;
+         reading one does. -->
+    <Modal v-if="mode && subject" :size="mode === 'view' ? 'lg' : 'md'" :dismissable="mode === 'view'" @close="close">
+      <ObjectEditor
+        v-if="mode === 'create' || mode === 'edit'"
+        :object="subject"
+        :title="mode === 'create' ? `New ${meta?.kind || resource}` : `Edit ${nameOf(subject)}`"
+        :busy="busy === 'save'"
+        :mode="mode === 'create' ? 'create' : 'edit'"
+        :schema="schema"
+        @save="save"
+        @cancel="close"
+      />
+
+      <Panel v-else>
+        <template #header>
+          <span>{{ nameOf(subject) || 'Object' }}</span>
+          <span class="ml-auto k-badge k-badge--muted">read-only</span>
+        </template>
+        <pre class="px-4 py-3 font-mono text-[11px] leading-relaxed overflow-auto max-h-[60vh] text-muted">{{ JSON.stringify(subject, null, 2) }}</pre>
+        <div class="px-4 py-2.5 border-t border-edge">
+          <button class="k-btn k-btn--ghost" @click="close">Close</button>
+        </div>
       </Panel>
+    </Modal>
 
-      <div v-if="mode" class="xl:sticky xl:top-6 space-y-2">
-        <p v-if="mode === 'create'" class="text-[11px] text-faint">
-          Finish or cancel this to open something from the list.
-        </p>
-
-        <ObjectEditor
-          v-if="subject && (mode === 'create' || mode === 'edit')"
-          :object="subject"
-          :title="mode === 'create' ? `New ${meta?.kind || resource}` : `Edit ${nameOf(subject)}`"
-          :busy="busy === 'save'"
-          :mode="mode === 'create' ? 'create' : 'edit'"
-          :schema="schema"
-          @save="save"
-          @cancel="close"
-        />
-
-        <Panel v-else-if="subject">
-          <template #header>
-            <span>{{ nameOf(subject) || 'Object' }}</span>
-            <span class="ml-auto k-badge k-badge--muted">read-only</span>
-          </template>
-          <pre class="px-4 py-3 font-mono text-[11px] leading-relaxed overflow-auto max-h-[32rem] text-muted">{{ JSON.stringify(subject, null, 2) }}</pre>
-          <div class="px-4 py-2.5 border-t border-edge">
-            <button class="k-btn k-btn--ghost" @click="close">Close</button>
-          </div>
-        </Panel>
-      </div>
-    </div>
-
-    <!-- Deleting is not undoable, so it is the one thing that asks. -->
-    <div
+    <ConfirmDialog
       v-if="confirming"
-      class="fixed inset-0 z-50 grid place-items-center bg-black/30 px-6"
-      @click.self="confirming = null"
+      :title="`Delete ${nameOfRow(confirming)}?`"
+      confirm-label="Delete"
+      busy-label="Deleting…"
+      :busy="!!busy && busy === nameOfRow(confirming)"
+      @confirm="remove(confirming)"
+      @cancel="confirming = null"
     >
-      <div class="k-card max-w-sm w-full">
-        <div class="px-4 py-2.5 border-b border-edge text-[13px] font-medium">
-          Delete {{ confirming.object ? nameOf(confirming.object) : '' }}?
-        </div>
-        <p class="px-4 py-3 text-xs text-muted">
-          This deletes the object in {{ session.tenant }}/{{ session.project }}. It cannot be undone.
-        </p>
-        <div class="px-4 py-2.5 border-t border-edge flex gap-2">
-          <button class="k-btn k-btn--danger" :disabled="!!busy" @click="remove(confirming)">
-            <Spinner v-if="busy && busy === nameOfRow(confirming)" />
-            {{ busy && busy === nameOfRow(confirming) ? 'Deleting…' : 'Delete' }}
-          </button>
-          <button class="k-btn k-btn--ghost" @click="confirming = null">Cancel</button>
-        </div>
-      </div>
-    </div>
+      This deletes the object in {{ session.tenant }}/{{ session.project }}. It cannot be undone.
+    </ConfirmDialog>
   </div>
 </template>

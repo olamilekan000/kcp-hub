@@ -83,6 +83,10 @@ unset variable falls back to the build's default:
 | `CONSOLE_OIDC_CLIENT_ID` | the public client |
 | `CONSOLE_OIDC_SCOPES` | the scopes to request |
 
+`--kcp-ca-file` adds the CA that signs `CONSOLE_KCP_SERVER`'s certificate,
+so the kubeconfig **Overview** hands out works without trusting anything
+else. Leave it off when that certificate is publicly trusted.
+
 The redirect URI is `<origin>/callback`, and the provider has to allow
 it, and the origin itself for the token request.
 `deploy/local/dex/dex.yaml` registers both the in-cluster console and the
@@ -111,12 +115,14 @@ those two prefixes to the front-proxy itself.
 | | |
 |---|---|
 | **Welcome** | first run: an identity that belongs to nothing gets a tenant and a project, in that order |
+| **Overview** | the selected project: what is enabled and published in it, your access, and a kubeconfig with commands to try |
 | **Tenants** | the tenants you belong to and your role in each; creating one |
 | **A tenant** | one tenant managed: the projects in it, your role, and adding a project |
 | **A producer** | one enabled producer in this project: what it is, how to use it, what it serves |
-| **Producers** | what you could enable, and enabling one into the selected project (bottom of the sidebar, with the API Explorer) |
+| **Catalog** | what you could enable, and enabling one into the selected project (bottom of the sidebar, with the API Explorer) |
 | **A provider's resource** | whatever an enabled offering serves: list, create, edit and delete it |
 | **API Explorer** | discovery for the selected workspace: which groups are served, which kinds, and the objects |
+| **Publish** | the producer's side: offering the selected project's own APIs in the catalog |
 | **Profile** | the identity the servers see — the username a Membership has to name |
 | **Admin** | the platform's own records, shown only when kcp answers that you may write them |
 
@@ -186,6 +192,38 @@ README has the format and the variable list.
 
 An API-shaped producer may ship none, and that is fine: its "how to use
 it" is the tables, listed under *Serves*.
+
+## Publishing from a project
+
+Any project can be a producer. **Publish** walks its admins through the
+three things that have to be true before an API reaches the catalog:
+
+1. **Registration.** The platform admin registers the project as an
+   `external` producer on **Admin**, choosing *An existing project* and
+   the project's path. Publish shows that path with a copy button, since
+   the console otherwise addresses workspaces by cluster name.
+2. **Consent.** *Allow the marketplace* creates the `marketplace-publish`
+   binding in the project, accepting the claims that export declares. The
+   page lists what each claim is for before you agree. A user cannot read
+   that export, so the console carries the list in `src/lib/publish.ts`;
+   it has to match `marketplace/config/apiexport/apiexport-publish.yaml`
+   in contrib-virtual-workspaces.
+3. **Publishing.** *New API* defines a kind with a few typed `spec`
+   fields, writing an `APIResourceSchema` and an unpublished `APIExport`.
+   *Publish* sets `marketplace.kcp.hub/publish: "true"` on the export, and
+   *Edit card* writes the display name, description and docs URL the
+   catalog shows. Unpublishing removes the annotation: existing bindings
+   keep working, but nobody new can enable it.
+
+Each API shows *draft*, *published, not listed* (consent or registration
+is missing) or *in the catalog*. The last comes from the catalog itself,
+not from the annotation, so it only says yes once consumers can see it.
+A newly registered producer can take up to a minute to turn Ready.
+
+Anything the form does not cover, such as several versions or nested
+fields, can be written with `kubectl`; any `APIExport` in the project
+shows up on the page either way. Whatever acts on the objects consumers
+create is the producer's to run.
 
 ## Generic CRUD, and where the columns come from
 

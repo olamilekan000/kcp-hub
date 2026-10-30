@@ -8,6 +8,8 @@ export interface Settings {
   oidcIssuer?: string
   oidcClientId?: string
   oidcScopes?: string
+  /** PEM that signs kcpServer's certificate, for downloaded kubeconfigs. */
+  kcpCA?: string
 }
 
 declare global {
@@ -24,4 +26,5 @@ export const settings: Required<Settings> = {
   oidcIssuer: runtime.oidcIssuer || (import.meta.env.VITE_OIDC_ISSUER as string) || '',
   oidcClientId: runtime.oidcClientId || (import.meta.env.VITE_OIDC_CLIENT_ID as string) || 'kcp',
   oidcScopes: runtime.oidcScopes || (import.meta.env.VITE_OIDC_SCOPES as string) || 'openid email groups',
+  kcpCA: runtime.kcpCA || '',
 }

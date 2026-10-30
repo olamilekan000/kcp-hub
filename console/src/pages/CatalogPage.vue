@@ -18,6 +18,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import Spinner from '@/components/Spinner.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import OfferingDetails from '@/components/OfferingDetails.vue'
 
 const session = useSession()
 
@@ -95,7 +97,7 @@ async function enable(offer: CatalogOffering) {
   try {
     await createBinding(workspace.value, offer.offering, offer.workspacePath, offer.export, offer.claims ?? [])
     noteError.value = false
-    note.value = `Enabled ${offer.metadata.name} in ${session.tenant}/${session.project}.`
+    note.value = `Enabled ${titleOf(offer)} in ${session.tenant}/${session.project}.`
     enabledNow.value = offer.offering
     // Re-read, so the entry stops offering to do it again.
     await load()
@@ -106,7 +108,7 @@ async function enable(offer: CatalogOffering) {
       e instanceof ApiError && e.forbidden
         ? `Forbidden in ${session.tenant}/${session.project}: you may not create APIBindings, or the offering is unpublished.`
         : e instanceof ApiError && e.status === 409
-          ? `${offer.metadata.name} is already enabled.`
+          ? `${titleOf(offer)} is already enabled.`
           : e instanceof Error
             ? e.message
             : String(e)
@@ -119,6 +121,9 @@ async function enable(offer: CatalogOffering) {
 // served, and anything in the workspace that was using it stops working
 // until it is enabled again.
 const confirming = ref<CatalogOffering | null>(null)
+
+/** The entry open in the details dialog. */
+const details = ref<CatalogOffering | null>(null)
 
 // The binding just created, so the success note can point at the page
 // that answers "now what" — which for a service-shaped producer is the
@@ -133,11 +138,12 @@ async function disable(offer: CatalogOffering) {
   try {
     await deleteBinding(workspace.value, binding.metadata.name)
     noteError.value = false
-    note.value = `Disabled ${offer.metadata.name} in ${session.tenant}/${session.project}.`
+    note.value = `Disabled ${titleOf(offer)} in ${session.tenant}/${session.project}.`
     confirming.value = null
     await load()
     await until(() => !bindingFor(offer))
   } catch (e) {
+    confirming.value = null
     noteError.value = true
     note.value =
       e instanceof ApiError && e.forbidden
@@ -150,6 +156,26 @@ async function disable(offer: CatalogOffering) {
   }
 }
 
+/**
+ * The card's name: the producer's display name, or the export's first
+ * word, as the sidebar shows it. The marketplace fills an unset display
+ * name with the export's name, so that counts as unset.
+ */
+function titleOf(offer: CatalogOffering): string {
+  const named = offer.displayName && offer.displayName !== offer.export ? offer.displayName : ''
+  return named || offer.offering.split(/[.-]/)[0].replace(/^\w/, (c) => c.toUpperCase())
+}
+
+/** What an offering asks to reach in your project, as resource names. */
+function asksFor(offer: CatalogOffering): string {
+  return [...new Set((offer.claims ?? []).map((c) => c.resource))].join(', ')
+}
+
+/** Where to go once it is enabled: the page for the binding it made. */
+function openLink(offer: CatalogOffering): string {
+  return `/p/${bindingFor(offer)?.metadata.name ?? offer.offering}`
+}
+
 onMounted(load)
 // Being enabled is a fact about one project, so switching re-reads it.
 watch(workspace, load)
@@ -158,8 +184,8 @@ watch(workspace, load)
 <template>
   <div>
     <PageHeader
-      title="Producers"
-      subtitle="APIs other teams have published. Enable one to use it in this project."
+      title="Catalog"
+      subtitle="APIs published by other teams. Enable one to use it in your project."
     >
       <template #actions>
         <span v-if="session.project" class="k-badge k-badge--muted">
@@ -175,83 +201,78 @@ watch(workspace, load)
       </RouterLink>
     </div>
 
+    <div v-if="!workspace && items.length" class="k-note k-note--info mb-4">
+      Pick a project at the top to enable APIs in it.
+    </div>
+
     <StateBlock :loading="loading" :error="error">
-      <div v-if="!items.length" class="k-card p-5 max-w-2xl text-xs text-muted leading-relaxed">
-        <div class="text-[13px] font-semibold text-ink mb-1">Nothing has been published yet</div>
-        <p class="mb-3">APIs appear here once a producer publishes one. To publish an API:</p>
-        <ol class="list-decimal pl-4 space-y-1.5 mb-3">
-          <li>Ask a platform admin to register you as a producer. This gives you your own producer workspace.</li>
-          <li>In that workspace, define your API as an <code class="font-mono text-[11px] text-ink bg-overlay px-1 rounded-[3px]">APIResourceSchema</code> and an <code class="font-mono text-[11px] text-ink bg-overlay px-1 rounded-[3px]">APIExport</code>.</li>
-          <li>
-            Add the annotation <code class="font-mono text-[11px] text-ink bg-overlay px-1 rounded-[3px]">marketplace.kcp.hub/publish: "true"</code> to the <code class="font-mono text-[11px] text-ink bg-overlay px-1 rounded-[3px]">APIExport</code>,
-            and <code class="font-mono text-[11px] text-ink bg-overlay px-1 rounded-[3px]">marketplace.kcp.hub/display-name</code> and
-            <code class="font-mono text-[11px] text-ink bg-overlay px-1 rounded-[3px]">marketplace.kcp.hub/description</code> to control how it looks here.
-          </li>
-        </ol>
+      <div v-if="!items.length" class="k-card p-5 max-w-2xl text-xs text-muted leading-relaxed space-y-3">
+        <div class="text-[13px] font-semibold text-ink">Nothing has been published yet</div>
         <p>
-          For a complete example to copy, see
-          <a
-            href="https://github.com/kcp-dev/contrib-virtual-workspaces/tree/marketplace.vw/producer-quickstart"
-            target="_blank"
-            rel="noreferrer"
-            class="text-accent underline"
-          ><code class="font-mono text-[11px] bg-overlay px-1 rounded-[3px]">producer-quickstart</code></a>
-          in the contrib-virtual-workspaces repository.
+          APIs show up here when a team publishes one. Any project can publish: open
+          <span class="text-ink">Publish</span> in the sidebar of a project you admin, define an API, and ask a
+          platform admin to register that project as a producer.
         </p>
+        <RouterLink v-if="workspace" to="/publish" class="k-btn k-btn--ghost">Publish from this project</RouterLink>
       </div>
       <div v-else class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div v-for="o in items" :key="o.metadata.name" class="k-card p-4 flex flex-col gap-2.5">
+        <div v-for="o in items" :key="o.metadata.name" class="k-card p-4 flex flex-col gap-2">
           <div class="flex items-start gap-2">
-            <div class="min-w-0">
-              <div class="text-[13px] font-semibold truncate">{{ o.displayName || o.metadata.name }}</div>
-              <div class="font-mono text-[10px] text-faint truncate">{{ o.metadata.name }}</div>
-            </div>
-            <span class="ml-auto k-badge shrink-0" :class="o.ready ? 'k-badge--success' : 'k-badge--warning'">
-              <span v-if="o.ready" class="k-badge__dot" />
-              {{ o.ready ? 'ready' : 'not ready' }}
-            </span>
-          </div>
-
-          <p v-if="o.description" class="text-xs text-muted leading-relaxed line-clamp-2">{{ o.description }}</p>
-
-          <div class="mt-auto pt-2 border-t border-edge flex items-center gap-2">
-            <div class="min-w-0 font-mono text-[10px] text-faint truncate" :title="`${o.workspacePath} → ${o.export}`">
-              {{ o.export }}
-              <span v-if="o.claims?.length"> · claims {{ o.claims.map((c) => c.resource).join(', ') }}</span>
-            </div>
-            <!-- Already enabled here: say so rather than offering again.
-                 A binding that exists but is not Bound yet is its own
-                 state — kcp is still establishing the API. -->
-            <div v-if="stateOf(o) === 'enabled'" class="ml-auto shrink-0 flex items-center gap-2">
-              <span
-                class="k-badge k-badge--success"
-                :title="`bound in ${session.tenant}/${session.project}`"
-              >
-                <span class="k-badge__dot" />
-                Enabled
-              </span>
-              <button
-                class="k-btn k-btn--ghost !px-2.5 !py-1"
-                :disabled="busy === o.metadata.name"
-                @click="confirming = o"
-              >
-                <Spinner v-if="busy === o.metadata.name" :size="12" />
-                {{ busy === o.metadata.name ? 'Disabling…' : 'Disable' }}
+            <div class="min-w-0" :title="`${o.export} from ${o.workspacePath}`">
+              <button class="block max-w-full text-left text-[13px] font-semibold truncate hover:text-accent" @click="details = o">
+                {{ titleOf(o) }}
               </button>
+              <div class="text-[11px] text-faint truncate">by {{ o.producer }}</div>
             </div>
+            <span v-if="stateOf(o) === 'enabled'" class="ml-auto k-badge k-badge--success shrink-0">
+              <span class="k-badge__dot" />
+              Enabled
+            </span>
             <span
               v-else-if="stateOf(o) === 'pending'"
-              class="k-badge k-badge--muted ml-auto shrink-0"
-              title="the binding exists; kcp is still establishing the API"
+              class="ml-auto k-badge k-badge--muted shrink-0"
+              title="kcp is still setting the API up in your project"
             >
               <Spinner :size="10" />
               Enabling…
             </span>
+            <span v-else-if="!o.ready" class="ml-auto k-badge k-badge--warning shrink-0" title="The producer is not ready yet">
+              Unavailable
+            </span>
+          </div>
+
+          <p class="text-xs text-muted leading-relaxed line-clamp-3">
+            {{ o.description || 'No description.' }}
+          </p>
+
+          <p v-if="asksFor(o)" class="text-[11px] text-faint">
+            Needs access to <span class="text-muted">{{ asksFor(o) }}</span> in your project.
+          </p>
+
+          <div class="mt-auto pt-2.5 border-t border-edge flex items-center gap-3">
+            <button class="text-[11px] text-accent hover:underline" @click="details = o">Details</button>
+            <a
+              v-if="o.docsURL"
+              :href="o.docsURL"
+              target="_blank"
+              rel="noreferrer"
+              class="text-[11px] text-accent hover:underline"
+            >Docs ↗</a>
+            <template v-if="stateOf(o) === 'enabled'">
+              <button
+                class="ml-auto k-btn k-btn--ghost !px-2.5 !py-1"
+                :disabled="busy === o.metadata.name"
+                @click="confirming = o"
+              >
+                Disable
+              </button>
+              <RouterLink :to="openLink(o)" class="k-btn k-btn--primary !px-2.5 !py-1">Open</RouterLink>
+            </template>
             <button
-              v-else
-              class="k-btn k-btn--ghost ml-auto shrink-0 !px-2.5 !py-1"
+              v-else-if="stateOf(o) === 'available'"
+              class="ml-auto k-btn k-btn--primary !px-2.5 !py-1"
               :disabled="!o.ready || !workspace || busy === o.metadata.name"
-              :title="workspace ? '' : 'Select a project'"
+              :title="workspace ? '' : 'Pick a project first'"
               @click="enable(o)"
             >
               <Spinner v-if="busy === o.metadata.name" :size="12" />
@@ -262,28 +283,24 @@ watch(workspace, load)
       </div>
     </StateBlock>
 
-    <div
+    <OfferingDetails
+      v-if="details"
+      :offering="details"
+      :title="titleOf(details)"
+      @close="details = null"
+    />
+
+    <ConfirmDialog
       v-if="confirming"
-      class="fixed inset-0 z-50 grid place-items-center bg-black/30 px-6"
-      @click.self="confirming = null"
+      :title="`Disable ${titleOf(confirming)}?`"
+      confirm-label="Disable"
+      busy-label="Disabling…"
+      :busy="busy === confirming.metadata.name"
+      @confirm="disable(confirming)"
+      @cancel="confirming = null"
     >
-      <div class="k-card max-w-sm w-full">
-        <div class="px-4 py-2.5 border-b border-edge text-[13px] font-medium">
-          Disable {{ confirming.metadata.name }}?
-        </div>
-        <p class="px-4 py-3 text-xs text-muted leading-relaxed">
-          This deletes the APIBinding in {{ session.tenant }}/{{ session.project }}, so
-          <code class="font-mono">{{ confirming.export }}</code> stops being served there and
-          anything using it stops working. Objects already created through it are left alone, and
-          enabling again brings the API back.
-        </p>
-        <div class="px-4 py-2.5 border-t border-edge flex gap-2">
-          <button class="k-btn k-btn--danger" :disabled="!!busy" @click="disable(confirming)">
-            Disable
-          </button>
-          <button class="k-btn k-btn--ghost" @click="confirming = null">Cancel</button>
-        </div>
-      </div>
-    </div>
+      It stops being available in {{ session.tenant }}/{{ session.project }}, and anything using it there
+      stops working. Objects you created with it are kept, and enabling it again brings them back.
+    </ConfirmDialog>
   </div>
 </template>

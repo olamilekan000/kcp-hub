@@ -120,6 +120,17 @@ export interface CatalogOffering {
    * {{variables}} the console fills in — see lib/instructions.ts.
    */
   instructions?: Record<string, string>
+  /** What enabling adds; a resource whose schema the marketplace cannot read has no versions. */
+  resources?: OfferingResource[]
+}
+
+export interface OfferingResource {
+  group?: string
+  resource: string
+  schema?: string
+  kind?: string
+  scope?: string
+  versions?: { name: string; served: boolean; storage: boolean; schema?: Record<string, unknown> }[]
 }
 
 export function offerings(): Promise<{ items?: CatalogOffering[] }> {
@@ -387,6 +398,17 @@ function fromItems(items: Record<string, unknown>[]): Table {
   }
 }
 
+export function getObject(
+  cluster: string,
+  groupVersion: string,
+  resource: string,
+  name: string,
+  namespace?: string,
+): Promise<Record<string, unknown>> {
+  const path = collectionPath(cluster, groupVersion, resource, namespace)
+  return request(`${path}/${encodeURIComponent(name)}`)
+}
+
 export function createObject(
   cluster: string,
   groupVersion: string,
@@ -412,6 +434,26 @@ export function replaceObject(
   return request(`${path}/${encodeURIComponent(name)}`, {
     method: 'PUT',
     body: JSON.stringify(object),
+  })
+}
+
+/**
+ * patchObject applies a JSON merge patch: a field set to null is removed,
+ * which is how an annotation is taken off.
+ */
+export function patchObject(
+  cluster: string,
+  groupVersion: string,
+  resource: string,
+  name: string,
+  patch: Record<string, unknown>,
+  namespace?: string,
+): Promise<Record<string, unknown>> {
+  const path = collectionPath(cluster, groupVersion, resource, namespace)
+  return request(`${path}/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/merge-patch+json' },
+    body: JSON.stringify(patch),
   })
 }
 
@@ -521,7 +563,7 @@ function resolveRef(doc: OpenAPIDoc, schema: OpenAPISchema): OpenAPISchema | nul
 }
 
 /** emptyFor is a placeholder of the right JSON shape for a field. */
-function emptyFor(def: OpenAPISchema): unknown {
+export function emptyFor(def: OpenAPISchema): unknown {
   switch (def.type) {
     case 'array':
       return []
@@ -592,19 +634,24 @@ export function createBinding(
       metadata: { name },
       spec: {
         reference: { export: { path: exportPath, name: exportName } },
-        permissionClaims: claims.map((c) => ({
-          group: c.group ?? '',
-          resource: c.resource,
-          verbs: c.verbs ?? [],
-          identityHash: c.identityHash ?? '',
-          // The provider's suggested scope, or every object — which is
-          // what a binding means by default.
-          selector: c.matchLabels ? { matchLabels: c.matchLabels } : { matchAll: true },
-          state: 'Accepted',
-        })),
+        permissionClaims: acceptedClaims(claims),
       },
     }),
   })
+}
+
+/** claims as a binding's spec.permissionClaims, every one accepted. */
+export function acceptedClaims(claims: OfferingClaim[]): Record<string, unknown>[] {
+  return claims.map((c) => ({
+    group: c.group ?? '',
+    resource: c.resource,
+    verbs: c.verbs ?? [],
+    identityHash: c.identityHash ?? '',
+    // The provider's suggested scope, or every object — which is
+    // what a binding means by default.
+    selector: c.matchLabels ? { matchLabels: c.matchLabels } : { matchAll: true },
+    state: 'Accepted',
+  }))
 }
 
 /**
@@ -628,7 +675,10 @@ export interface BoundResource {
 
 export interface APIBinding {
   metadata: { name: string }
-  spec?: { reference?: { export?: { path?: string; name?: string } } }
+  spec?: {
+    reference?: { export?: { path?: string; name?: string } }
+    permissionClaims?: { group?: string; resource: string; state?: string }[]
+  }
   status?: { phase?: string; boundResources?: BoundResource[] }
 }
 

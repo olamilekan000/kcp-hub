@@ -34,7 +34,12 @@ const tenantNav = computed(() =>
 // to it, and discovery over it, sit at the bottom.
 const nav = computed(() => {
   const items: { to: string; label: string }[] = []
+  // Until there is a project to work in, the wizard that makes one stays
+  // one click away, wherever else they have wandered.
+  if (session.nothingToWorkIn) items.push({ to: '/welcome', label: 'Get started' })
+  if (session.workspace) items.push({ to: '/project', label: 'Overview' })
   if (session.admin) items.push({ to: '/admin', label: 'Admin' })
+  if (session.workspace) items.push({ to: '/publish', label: 'Publish' })
   return items
 })
 
@@ -57,7 +62,7 @@ const enabledNav = computed(() => {
 // The bottom of the sidebar is about the place rather than the work done
 // in it.
 const bottomNav = [
-  { to: '/catalog', label: 'Producers' },
+  { to: '/catalog', label: 'Catalog' },
   { to: '/api', label: 'API Explorer' },
 ]
 
@@ -143,7 +148,7 @@ function logout() {
           </RouterLink>
 
           <template v-if="enabledNav.length">
-            <div class="k-eyebrow px-2.5 pb-1" :class="nav.length > 0 ? 'pt-4' : ''">Producers</div>
+            <div class="k-eyebrow px-2.5 pb-1" :class="nav.length > 0 ? 'pt-4' : ''">Enabled</div>
             <RouterLink v-for="item in enabledNav" :key="item.to" :to="item.to" class="k-nav-link">
               <span class="truncate">{{ item.label }}</span>
               <span class="ml-auto font-mono text-[9px] text-faint truncate max-w-20">{{ item.hint }}</span>

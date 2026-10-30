@@ -49,6 +49,9 @@ type settings struct {
 	OIDCIssuer   string `json:"oidcIssuer,omitempty"`
 	OIDCClientID string `json:"oidcClientId,omitempty"`
 	OIDCScopes   string `json:"oidcScopes,omitempty"`
+	// KCPCA is the PEM bundle that signs KCPServer's certificate, so the
+	// kubeconfig the UI hands out works without trusting anything else.
+	KCPCA string `json:"kcpCA,omitempty"`
 }
 
 func main() {
@@ -58,14 +61,23 @@ func main() {
 	upstreamCA := flag.String("upstream-ca-file", "", "CA bundle that signs the front-proxy's certificate.")
 	tlsCert := flag.String("tls-cert-file", "", "Serve HTTPS with this certificate.")
 	tlsKey := flag.String("tls-key-file", "", "Key for --tls-cert-file.")
+	kcpCA := flag.String("kcp-ca-file", "", "CA bundle that signs CONSOLE_KCP_SERVER's certificate, for the kubeconfigs the UI hands out.")
 	flag.Parse()
 
-	cfg, err := configJS(settings{
+	s := settings{
 		KCPServer:    os.Getenv("CONSOLE_KCP_SERVER"),
 		OIDCIssuer:   os.Getenv("CONSOLE_OIDC_ISSUER"),
 		OIDCClientID: os.Getenv("CONSOLE_OIDC_CLIENT_ID"),
 		OIDCScopes:   os.Getenv("CONSOLE_OIDC_SCOPES"),
-	})
+	}
+	if *kcpCA != "" {
+		pem, err := os.ReadFile(*kcpCA)
+		if err != nil {
+			log.Fatalf("read --kcp-ca-file: %v", err)
+		}
+		s.KCPCA = string(pem)
+	}
+	cfg, err := configJS(s)
 	if err != nil {
 		log.Fatal(err)
 	}
