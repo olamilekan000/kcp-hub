@@ -1,12 +1,6 @@
 SHELL := /usr/bin/env bash
 .DEFAULT_GOAL := help
 
-ISSUES := https://github.com/olamilekan000/kcp-hub/issues
-
-define not-yet
-	@echo "$@ is not implemented yet, see $(ISSUES)/$(1)" >&2; exit 1
-endef
-
 ##@ Platform
 
 .PHONY: up
@@ -35,8 +29,8 @@ console-image: ## Build the console image as kcp-hub/console:dev
 ##@ Checks
 
 .PHONY: test
-test: ## Smoke test a running platform (not implemented yet)
-	$(call not-yet,8)
+test: ## Smoke test a platform started with make up (needs jq)
+	hack/smoke-test.sh
 
 .PHONY: test-console
 test-console: ## Type check, build and test the console (needs node and go)
