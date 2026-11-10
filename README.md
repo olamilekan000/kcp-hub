@@ -133,6 +133,10 @@ export KUBECONFIG=$PWD/.hub/users/alice.kubeconfig
 kubectl auth whoami
 ```
 
+`make test` checks that the platform works: alice signs in, gets a new
+tenant and a project, enables Widgets in the project and creates a Widget.
+CI runs `make up` and `make test` on every pull request.
+
 ### Versions
 
 [`versions.env`](versions.env) says which versions hub runs. To move to a
