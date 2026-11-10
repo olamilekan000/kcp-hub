@@ -132,3 +132,10 @@ make login EMAIL=alice@team-a.example.com
 export KUBECONFIG=$PWD/.hub/users/alice.kubeconfig
 kubectl auth whoami
 ```
+
+### Versions
+
+[`versions.env`](versions.env) says which versions hub runs. To move to a
+new contrib-virtual-workspaces release, set `CONTRIB_VERSION` to its tag,
+for example `v0.2.0`, and run `make up` again. A full commit SHA works too:
+if its images are not published, `make up` builds them from that commit.

@@ -5,22 +5,24 @@
 set -euo pipefail
 
 CLUSTER_NAME=${CLUSTER_NAME:-kcp-hub}
-CERT_MANAGER_VERSION=v1.19.2
-ENVOY_GATEWAY_VERSION=v1.7.0
-
-# contrib-virtual-workspaces has not published images for this commit, so
-# they are built from it when they cannot be pulled. The manifests in
-# deploy/local name the same images.
-CONTRIB_REPO=https://github.com/kcp-dev/contrib-virtual-workspaces
-CONTRIB_REF=14476ca92695431da25bfb43762ccadf1d5a954a
-TENANCY_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/tenancy-vw:sha-$CONTRIB_REF
-MARKETPLACE_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/marketplace-vw:sha-$CONTRIB_REF
-
-# The console is built from console/ unless CONSOLE_IMAGE names a published
-# one, such as ghcr.io/olamilekan000/kcp-hub/console:main.
-CONSOLE_IMAGE=${CONSOLE_IMAGE:-}
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+console_image_override=${CONSOLE_IMAGE:-}
+# shellcheck source=/dev/null
+. "$ROOT/versions.env"
+CONSOLE_IMAGE=${console_image_override:-$CONSOLE_IMAGE}
+
+# Release v0.2.0 is published as 0.2.0, a commit as sha-<commit>.
+CONTRIB_REPO=https://github.com/kcp-dev/contrib-virtual-workspaces
+if [[ $CONTRIB_VERSION == v[0-9]* ]]; then
+  CONTRIB_TAG=${CONTRIB_VERSION#v}
+else
+  CONTRIB_TAG=sha-$CONTRIB_VERSION
+fi
+TENANCY_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/tenancy-vw:$CONTRIB_TAG
+MARKETPLACE_IMAGE=ghcr.io/kcp-dev/contrib-virtual-workspaces/marketplace-vw:$CONTRIB_TAG
+
 DEPLOY=$ROOT/deploy/local
 STATE=$ROOT/.hub
 
@@ -34,7 +36,7 @@ KUBECTL=(kubectl --context "kind-$CLUSTER_NAME")
 step() { printf '\n==> %s\n' "$*"; }
 
 # Makes a contrib-virtual-workspaces image available in the cluster:
-# pulled if it is published, otherwise built from CONTRIB_REF.
+# pulled if it is published, otherwise built from CONTRIB_VERSION.
 contrib_image() {
   local target=$1 image=$2 src=$STATE/src/contrib-virtual-workspaces
   if docker exec "$CLUSTER_NAME-control-plane" crictl inspecti "$image" >/dev/null 2>&1; then
@@ -42,12 +44,12 @@ contrib_image() {
     return
   fi
   if ! docker image inspect "$image" >/dev/null 2>&1 && ! docker pull -q "$image" 2>/dev/null; then
-    echo "$image is not published; building it from $CONTRIB_REPO at $CONTRIB_REF"
+    echo "$image is not published; building it from $CONTRIB_REPO at $CONTRIB_VERSION"
     if [ ! -d "$src/.git" ]; then
       git init -q "$src"
       git -C "$src" remote add origin "$CONTRIB_REPO"
     fi
-    git -C "$src" fetch -q --depth 1 origin "$CONTRIB_REF"
+    git -C "$src" fetch -q --depth 1 origin "$CONTRIB_VERSION"
     git -C "$src" checkout -q --detach FETCH_HEAD
     docker build --target "$target" -t "$image" "$src"
   fi
@@ -68,6 +70,12 @@ restart_on_change() {
   } | shasum | cut -c1-16)
   "${KUBECTL[@]}" -n "$namespace" patch deployment "$deployment" --type=merge \
     -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"hub.kcp.io/inputs\":\"$sum\"}}}}}"
+}
+
+# Applies manifests from stdin, with the contrib image tag from versions.env
+# in place of CONTRIB_TAG.
+apply_versioned() {
+  sed "s|CONTRIB_TAG|$CONTRIB_TAG|g" | "${KUBECTL[@]}" "$@" apply -f -
 }
 
 # Runs kubectl as the kcp admin in one kcp workspace.
@@ -191,12 +199,12 @@ echo "kcp accepts Dex tokens ($check_user)"
 
 step "tenancy"
 contrib_image tenancy-vw "$TENANCY_IMAGE"
-"${KUBECTL[@]}" apply -k "$DEPLOY/tenancy"
+"${KUBECTL[@]}" kustomize "$DEPLOY/tenancy" | apply_versioned
 "${KUBECTL[@]}" -n kcp wait kubeconfig/tenancy-bootstrap kubeconfig/tenancy-vw kubeconfig/tenancy-operator \
   --for=condition=Available --timeout=5m
 wait_deployment tenancy-virtual-workspace
 in_workspace root:tenancy:tenants apply -f "$DEPLOY/tenancy/tenants-locator.yaml"
-"${KUBECTL[@]}" -n kcp apply -f "$DEPLOY/tenancy/operator.yaml"
+apply_versioned -n kcp <"$DEPLOY/tenancy/operator.yaml"
 wait_deployment tenancy-operator
 
 review=$(curl -sk --max-time 10 --resolve kcp.localhost:8443:127.0.0.1 \
@@ -212,14 +220,14 @@ echo "tenancy answers at https://kcp.localhost:8443/services/tenancy"
 
 step "marketplace"
 contrib_image marketplace-vw "$MARKETPLACE_IMAGE"
-"${KUBECTL[@]}" apply -k "$DEPLOY/marketplace"
+"${KUBECTL[@]}" kustomize "$DEPLOY/marketplace" | apply_versioned
 "${KUBECTL[@]}" -n kcp wait kubeconfig/marketplace-bootstrap kubeconfig/marketplace-vw \
   kubeconfig/marketplace-operator --for=condition=Available --timeout=5m
 wait_deployment marketplace-virtual-workspace
 for ws in root:marketplace:catalog root:marketplace:producers; do
   in_workspace "$ws" apply -f "$DEPLOY/marketplace/locator.yaml"
 done
-"${KUBECTL[@]}" -n kcp apply -f "$DEPLOY/marketplace/operator.yaml"
+apply_versioned -n kcp <"$DEPLOY/marketplace/operator.yaml"
 wait_deployment marketplace-operator
 
 echo "publishing the example producer"

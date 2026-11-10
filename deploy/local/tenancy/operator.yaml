@@ -19,7 +19,8 @@ spec:
     spec:
       containers:
         - name: operator
-          image: ghcr.io/kcp-dev/contrib-virtual-workspaces/tenancy-vw:sha-14476ca92695431da25bfb43762ccadf1d5a954a
+          # hack/up.sh replaces CONTRIB_TAG with the version in versions.env.
+          image: ghcr.io/kcp-dev/contrib-virtual-workspaces/tenancy-vw:CONTRIB_TAG
           args:
             - operator
             - --kubeconfig=/etc/tenancy/kubeconfig
