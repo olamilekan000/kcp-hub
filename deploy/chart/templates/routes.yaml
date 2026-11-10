@@ -1,0 +1,22 @@
+{{- if .Values.gateway.enabled }}
+{{- $parent := .Values.gateway.parentRef }}
+{{- range $name, $route := dict "front-proxy" (list .Values.hostname "frontproxy-front-proxy" 8443) "root" (list (include "hub.rootHostname" .) "root-kcp" 6443) }}
+---
+apiVersion: gateway.networking.k8s.io/v1alpha3
+kind: TLSRoute
+metadata:
+  name: {{ $name }}
+spec:
+  parentRefs:
+    - name: {{ required "gateway.parentRef.name is required" $parent.name }}
+      {{- with $parent.namespace }}
+      namespace: {{ . }}
+      {{- end }}
+  hostnames:
+    - {{ index $route 0 }}
+  rules:
+    - backendRefs:
+        - name: {{ index $route 1 }}
+          port: {{ index $route 2 }}
+{{- end }}
+{{- end }}

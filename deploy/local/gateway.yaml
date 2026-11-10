@@ -36,7 +36,7 @@ metadata:
   namespace: envoy-gateway-system
 spec:
   # Pods reach the kcp hostnames through this address (see hostAliases in
-  # deploy/local/kcp), the same way the host reaches them on port 8443.
+  # deploy/local/values.yaml), the same way the host reaches them on port 8443.
   addresses:
     - type: IPAddress
       value: 10.96.2.2

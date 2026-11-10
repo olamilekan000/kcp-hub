@@ -1,6 +1,8 @@
+{{- if not .Values.tls.issuerRef.name }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: selfsigned
 spec:
   selfSigned: {}
+{{- end }}

@@ -4,6 +4,7 @@ ignore: |
   .hub/
   console/node_modules/
   console/dist/
+  deploy/chart/templates/
 
 rules:
   document-start: disable

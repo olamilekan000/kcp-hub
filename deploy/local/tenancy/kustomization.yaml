@@ -1,6 +1,6 @@
 # Tenancy, from the tenancy-vw image of contrib-virtual-workspaces: the
 # virtual workspace, whose init container sets tenancy up in kcp. The
-# front-proxy route to it is in deploy/local/kcp/frontproxy.yaml.
+# front-proxy route to it is in deploy/chart/templates/frontproxy.yaml.
 #
 # hack/up.sh applies operator.yaml separately, once init has run and
 # tenants-locator.yaml is in place, because the operator cannot start
