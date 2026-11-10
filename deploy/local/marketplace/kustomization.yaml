@@ -3,8 +3,8 @@
 # sets the marketplace up in kcp. The front-proxy route to it is in
 # deploy/chart/templates/frontproxy.yaml.
 #
-# hack/up.sh applies operator.yaml separately, once init has run and
-# locator.yaml is in place, because the operator cannot start before then.
+# hack/up.sh applies operator.yaml separately, once init has run, because
+# the operator cannot start before then.
 # example/ is applied inside kcp, also by hack/up.sh.
 namespace: kcp
 resources:
