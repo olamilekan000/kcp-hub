@@ -1,7 +1,7 @@
 # Dex, the OIDC issuer for local development, at
 # https://dex.kcp.localhost:8443/dex. The host reaches it through the
 # gateway on port 8443 and the kcp pods through the gateway's cluster
-# address (hostAliases in deploy/local/kcp), so the issuer URL is the same
+# address (hostAliases in deploy/local/values.yaml), so the issuer URL is the same
 # for both.
 apiVersion: v1
 kind: ServiceAccount

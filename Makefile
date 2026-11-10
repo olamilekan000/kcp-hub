@@ -37,7 +37,12 @@ test-console: ## Type check, build and test the console (needs node and go)
 	cd console && npm ci && npm run build && npm test && go test ./...
 
 .PHONY: lint
-lint: lint-yaml lint-shell ## Run all linters
+lint: lint-yaml lint-shell lint-chart ## Run all linters
+
+.PHONY: lint-chart
+lint-chart: ## Lint the Helm chart, with its defaults and with the local values (needs helm)
+	helm lint deploy/chart --set gateway.parentRef.name=eg
+	helm lint deploy/chart -f deploy/local/values.yaml
 
 .PHONY: lint-yaml
 lint-yaml: ## Lint YAML files (needs yamllint)

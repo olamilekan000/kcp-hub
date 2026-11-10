@@ -1,0 +1,50 @@
+# Settings for installing kcp hub into a cluster. deploy/local/values.yaml
+# holds the ones make up uses.
+
+# The hostname users and tools reach kcp at. The root shard is reached at
+# root.<hostname>. Both have to point at the gateway below.
+hostname: kcp.example.com
+# The port on that hostname.
+port: 443
+
+kcp:
+  # The kcp image tag, for the shard and the front-proxy.
+  tag: main
+  # etcd that kcp stores its data in.
+  etcdEndpoints:
+    - http://etcd.kcp-etcd.svc.cluster.local:2379
+
+tls:
+  # The cert-manager issuer kcp-operator creates kcp's CA from. Empty
+  # creates a self-signed Issuer in the release namespace.
+  issuerRef: {}
+  #   group: cert-manager.io
+  #   kind: ClusterIssuer
+  #   name: my-issuer
+
+# The OpenID Connect provider users sign in with. Without an issuerURL,
+# kcp accepts only certificates and service account tokens.
+oidc:
+  issuerURL: ""
+  clientID: kcp
+  usernameClaim: email
+  groupsClaim: groups
+  # A Secret in the release namespace with the CA of the issuer's
+  # certificate, when that is not publicly trusted.
+  caSecret:
+    name: ""
+    key: ca.crt
+
+# The Gateway API gateway that routes the hostnames to kcp. It needs a TLS
+# passthrough listener, because kcp terminates TLS itself.
+gateway:
+  enabled: true
+  parentRef:
+    name: ""
+    namespace: ""
+
+# Extra /etc/hosts entries for kcp's pods, for when the hostnames do not
+# resolve to the gateway from inside the cluster.
+hostAliases: []
+#  - ip: 10.0.0.1
+#    hostnames: [kcp.example.com, root.kcp.example.com]

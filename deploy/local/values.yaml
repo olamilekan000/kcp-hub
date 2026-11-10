@@ -1,0 +1,23 @@
+# The chart settings make up uses for the kind cluster.
+hostname: kcp.localhost
+port: 8443
+
+oidc:
+  issuerURL: https://dex.kcp.localhost:8443/dex
+  # Dex's certificate comes from the local CA, which hack/up.sh copies here.
+  caSecret:
+    name: hub-ca
+
+gateway:
+  parentRef:
+    name: eg
+    namespace: envoy-gateway-system
+
+# The gateway's address (see deploy/local/gateway.yaml). Pods reach the
+# kcp and Dex hostnames through it, the same way the host does on port 8443.
+hostAliases:
+  - ip: 10.96.2.2
+    hostnames:
+      - kcp.localhost
+      - root.kcp.localhost
+      - dex.kcp.localhost

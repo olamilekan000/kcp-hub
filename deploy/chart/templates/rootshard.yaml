@@ -1,0 +1,40 @@
+apiVersion: operator.kcp.io/v1alpha1
+kind: RootShard
+metadata:
+  name: root
+spec:
+  external:
+    hostname: {{ .Values.hostname }}
+    port: {{ .Values.port }}
+  shardBaseURL: https://{{ include "hub.rootHostname" . }}:{{ .Values.port }}
+  image:
+    tag: {{ .Values.kcp.tag }}
+  certificates:
+    issuerRef:
+      {{- include "hub.issuerRef" . | nindent 6 }}
+  certificateTemplates:
+    server:
+      spec:
+        dnsNames:
+          - {{ include "hub.rootHostname" . }}
+  cache:
+    embedded:
+      enabled: true
+  etcd:
+    endpoints:
+      {{- toYaml .Values.kcp.etcdEndpoints | nindent 6 }}
+  auth:
+    serviceAccount:
+      enabled: true
+    # Must match the front-proxy's, so a token names the same user on both.
+    {{- include "hub.oidc" . | nindent 4 }}
+  extraArgs:
+    - --feature-gates=CacheAPIs=true,WorkspaceMounts=true
+    - --etcd-prefix=/shard/root
+  # kcp calls itself on its external hostnames and fetches the OIDC
+  # provider's keys from the issuer URL.
+  {{- include "hub.deploymentTemplate" . | nindent 2 }}
+  proxy:
+    image:
+      tag: {{ .Values.kcp.tag }}
+    {{- include "hub.deploymentTemplate" . | nindent 4 }}

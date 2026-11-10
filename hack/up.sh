@@ -153,7 +153,9 @@ restart_on_change dex dex dex-tls dex
 "${KUBECTL[@]}" -n dex rollout status deployment/dex --timeout=5m
 
 step "kcp"
-"${KUBECTL[@]}" apply -k "$DEPLOY/kcp"
+helm upgrade --install kcp-hub "$ROOT/deploy/chart" \
+  --kube-context "kind-$CLUSTER_NAME" --namespace kcp \
+  -f "$DEPLOY/values.yaml"
 "${KUBECTL[@]}" -n kcp wait kubeconfig/admin --for=condition=Available --timeout=10m
 "${KUBECTL[@]}" -n kcp get secret kcp-admin-kubeconfig -o jsonpath='{.data.kubeconfig}' \
   | base64 -d >"$STATE/admin.kubeconfig"
