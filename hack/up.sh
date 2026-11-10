@@ -205,7 +205,6 @@ contrib_image tenancy-vw "$TENANCY_IMAGE"
 "${KUBECTL[@]}" -n kcp wait kubeconfig/tenancy-bootstrap kubeconfig/tenancy-vw kubeconfig/tenancy-operator \
   --for=condition=Available --timeout=5m
 wait_deployment tenancy-virtual-workspace
-in_workspace root:tenancy:tenants apply -f "$DEPLOY/tenancy/tenants-locator.yaml"
 apply_versioned -n kcp <"$DEPLOY/tenancy/operator.yaml"
 wait_deployment tenancy-operator
 
@@ -226,9 +225,6 @@ contrib_image marketplace-vw "$MARKETPLACE_IMAGE"
 "${KUBECTL[@]}" -n kcp wait kubeconfig/marketplace-bootstrap kubeconfig/marketplace-vw \
   kubeconfig/marketplace-operator --for=condition=Available --timeout=5m
 wait_deployment marketplace-virtual-workspace
-for ws in root:marketplace:catalog root:marketplace:producers; do
-  in_workspace "$ws" apply -f "$DEPLOY/marketplace/locator.yaml"
-done
 apply_versioned -n kcp <"$DEPLOY/marketplace/operator.yaml"
 wait_deployment marketplace-operator
 
