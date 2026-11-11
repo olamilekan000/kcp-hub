@@ -72,12 +72,6 @@ restart_on_change() {
     -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"hub.kcp.io/inputs\":\"$sum\"}}}}}"
 }
 
-# Applies manifests from stdin, with the contrib image tag from versions.env
-# in place of CONTRIB_TAG.
-apply_versioned() {
-  sed "s|CONTRIB_TAG|$CONTRIB_TAG|g" | "${KUBECTL[@]}" "$@" apply -f -
-}
-
 # Runs kubectl as the kcp admin in one kcp workspace.
 in_workspace() {
   local ws=$1
@@ -153,9 +147,11 @@ restart_on_change dex dex dex-tls dex
 "${KUBECTL[@]}" -n dex rollout status deployment/dex --timeout=5m
 
 step "kcp"
+contrib_image tenancy-vw "$TENANCY_IMAGE"
+contrib_image marketplace-vw "$MARKETPLACE_IMAGE"
 helm upgrade --install kcp-hub "$ROOT/deploy/chart" \
   --kube-context "kind-$CLUSTER_NAME" --namespace kcp \
-  -f "$DEPLOY/values.yaml"
+  -f "$DEPLOY/values.yaml" --set contrib.tag="$CONTRIB_TAG"
 "${KUBECTL[@]}" -n kcp wait kubeconfig/admin --for=condition=Available --timeout=10m
 "${KUBECTL[@]}" -n kcp get secret kcp-admin-kubeconfig -o jsonpath='{.data.kubeconfig}' \
   | base64 -d >"$STATE/admin.kubeconfig"
@@ -200,12 +196,7 @@ fi
 echo "kcp accepts Dex tokens ($check_user)"
 
 step "tenancy"
-contrib_image tenancy-vw "$TENANCY_IMAGE"
-"${KUBECTL[@]}" kustomize "$DEPLOY/tenancy" | apply_versioned
-"${KUBECTL[@]}" -n kcp wait kubeconfig/tenancy-bootstrap kubeconfig/tenancy-vw kubeconfig/tenancy-operator \
-  --for=condition=Available --timeout=5m
 wait_deployment tenancy-virtual-workspace
-apply_versioned -n kcp <"$DEPLOY/tenancy/operator.yaml"
 wait_deployment tenancy-operator
 
 review=$(curl -sk --max-time 10 --resolve kcp.localhost:8443:127.0.0.1 \
@@ -220,12 +211,7 @@ fi
 echo "tenancy answers at https://kcp.localhost:8443/services/tenancy"
 
 step "marketplace"
-contrib_image marketplace-vw "$MARKETPLACE_IMAGE"
-"${KUBECTL[@]}" kustomize "$DEPLOY/marketplace" | apply_versioned
-"${KUBECTL[@]}" -n kcp wait kubeconfig/marketplace-bootstrap kubeconfig/marketplace-vw \
-  kubeconfig/marketplace-operator --for=condition=Available --timeout=5m
 wait_deployment marketplace-virtual-workspace
-apply_versioned -n kcp <"$DEPLOY/marketplace/operator.yaml"
 wait_deployment marketplace-operator
 
 echo "publishing the example producer"
