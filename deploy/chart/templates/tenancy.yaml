@@ -1,0 +1,45 @@
+{{- $c := dict "ctx" . "name" "tenancy" }}
+{{- include "hub.kubeconfigs" "tenancy" }}
+---
+# The tenancy virtual workspace, which the front-proxy serves at
+# /services/tenancy. kcp-operator runs it as a Deployment and Service named
+# tenancy-virtual-workspace. Its init container sets tenancy up in kcp
+# before the server starts.
+apiVersion: operator.kcp.io/v1alpha1
+kind: VirtualWorkspace
+metadata:
+  name: tenancy
+spec:
+  target:
+    rootShardRef:
+      name: root
+  external:
+    hostname: {{ .Values.hostname }}
+    port: {{ .Values.port }}
+  image:
+    repository: {{ .Values.contrib.repository }}/tenancy-vw
+    tag: {{ .Values.contrib.tag }}
+  # The operator's default is two replicas requesting a CPU each.
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  command: ["/tenancy-vw", "virtualworkspace"]
+  kubeconfigSecretRef:
+    name: tenancy-vw-kubeconfig
+  initContainers:
+    {{- include "hub.initContainer" $c | nindent 4 }}
+  extraArgs:
+    - --endpoint-base=https://{{ .Values.hostname }}:{{ .Values.port }}/clusters/
+    {{- if .Values.tenancy.selfServiceTenants }}
+    - --self-service-tenants
+    {{- end }}
+    {{- include "hub.oidcArgs" . | nindent 4 }}
+  {{- include "hub.oidcVolume" . | nindent 2 }}
+  {{- include "hub.deploymentTemplate" . | nindent 2 }}
+---
+# The tenancy operator turns Tenants, Projects and Memberships into
+# workspaces and RBAC. It is not a kcp admin: it acts through the tenancy
+# exports, which init allows the tenancy-operator user to use.
+{{ include "hub.operator" (merge (dict "args" (list "--tenants-workspace=root:tenancy:tenants")) $c) }}

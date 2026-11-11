@@ -1,0 +1,44 @@
+{{- $c := dict "ctx" . "name" "marketplace" }}
+{{- include "hub.kubeconfigs" "marketplace" }}
+---
+# The marketplace virtual workspace, which the front-proxy serves at
+# /services/marketplace. kcp-operator runs it as a Deployment and Service
+# named marketplace-virtual-workspace. Its init container sets the
+# marketplace up in kcp before the server starts.
+apiVersion: operator.kcp.io/v1alpha1
+kind: VirtualWorkspace
+metadata:
+  name: marketplace
+spec:
+  target:
+    rootShardRef:
+      name: root
+  external:
+    hostname: {{ .Values.hostname }}
+    port: {{ .Values.port }}
+  image:
+    repository: {{ .Values.contrib.repository }}/marketplace-vw
+    tag: {{ .Values.contrib.tag }}
+  # The operator's default is two replicas requesting a CPU each.
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  command: ["/marketplace-vw", "virtualworkspace"]
+  kubeconfigSecretRef:
+    name: marketplace-vw-kubeconfig
+  initContainers:
+    {{- include "hub.initContainer" $c | nindent 4 }}
+  {{- with include "hub.oidcArgs" . }}
+  extraArgs:
+    {{- . | nindent 4 }}
+  {{- end }}
+  {{- include "hub.oidcVolume" . | nindent 2 }}
+  {{- include "hub.deploymentTemplate" . | nindent 2 }}
+---
+# The marketplace operator provisions producer workspaces and lets anyone
+# signed in bind what producers publish. It is not a kcp admin: it acts
+# through the marketplace exports, which init allows the
+# marketplace-operator user to use.
+{{ include "hub.operator" (merge (dict "args" (list "--catalog-workspace=root:marketplace:catalog" "--producers-workspace=root:marketplace:producers")) $c) }}

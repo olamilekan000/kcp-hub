@@ -14,6 +14,24 @@ kcp:
   etcdEndpoints:
     - http://etcd.kcp-etcd.svc.cluster.local:2379
 
+# The tenancy and marketplace images, from contrib-virtual-workspaces.
+contrib:
+  repository: ghcr.io/kcp-dev/contrib-virtual-workspaces
+  # 0.2.0 for release v0.2.0, sha-<commit> for a commit.
+  tag: ""
+
+# Who may manage tenants and the producer catalog. Each entry is a user or
+# group as kcp sees it, so with OIDC the value of the username or groups
+# claim.
+platformAdmins:
+  users: []
+  groups: []
+
+tenancy:
+  # Lets a signed-in user request their own tenant, without waiting for a
+  # platform admin.
+  selfServiceTenants: false
+
 tls:
   # The cert-manager issuer kcp-operator creates kcp's CA from. Empty
   # creates a self-signed Issuer in the release namespace.

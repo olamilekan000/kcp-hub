@@ -2,6 +2,16 @@
 hostname: kcp.localhost
 port: 8443
 
+# contrib.tag is set by hack/up.sh from versions.env.
+
+# A user in Dex's static passwords (see deploy/local/dex/dex.yaml).
+platformAdmins:
+  users:
+    - admin@platform.example.com
+
+tenancy:
+  selfServiceTenants: true
+
 oidc:
   issuerURL: https://dex.kcp.localhost:8443/dex
   # Dex's certificate comes from the local CA, which hack/up.sh copies here.
