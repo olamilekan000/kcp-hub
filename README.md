@@ -97,7 +97,8 @@ kcp: the marketplace never writes into consumer workspaces.
 ## Running it locally
 
 New to kcp hub? [Getting started](docs/getting-started.md) walks through
-starting it, signing in, and enabling and publishing an API.
+starting it, signing in, and enabling and publishing an API. To install it
+in your own cluster, see [Installing in your cluster](docs/install.md).
 
 `make up` creates a kind cluster with kcp at `https://kcp.localhost:8443`
 and Dex, the sign-in provider, at `https://dex.kcp.localhost:8443/dex`.
