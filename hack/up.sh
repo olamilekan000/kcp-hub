@@ -149,9 +149,19 @@ restart_on_change dex dex dex-tls dex
 step "kcp"
 contrib_image tenancy-vw "$TENANCY_IMAGE"
 contrib_image marketplace-vw "$MARKETPLACE_IMAGE"
+console_image=${CONSOLE_IMAGE:-kcp-hub/console:dev}
+if [ -n "$CONSOLE_IMAGE" ]; then
+  docker pull "$console_image"
+else
+  docker build -t "$console_image" "$ROOT/console"
+fi
+# Loaded rather than pulled by the cluster, so a moved tag such as :main
+# reaches it too, through the image ID in the console step.
+kind load docker-image "$console_image" --name "$CLUSTER_NAME"
 helm upgrade --install kcp-hub "$ROOT/deploy/chart" \
   --kube-context "kind-$CLUSTER_NAME" --namespace kcp \
-  -f "$DEPLOY/values.yaml" --set contrib.tag="$CONTRIB_TAG"
+  -f "$DEPLOY/values.yaml" --set contrib.tag="$CONTRIB_TAG" \
+  --set console.image.repository="${console_image%:*}" --set console.image.tag="${console_image##*:}"
 "${KUBECTL[@]}" -n kcp wait kubeconfig/admin --for=condition=Available --timeout=10m
 "${KUBECTL[@]}" -n kcp get secret kcp-admin-kubeconfig -o jsonpath='{.data.kubeconfig}' \
   | base64 -d >"$STATE/admin.kubeconfig"
@@ -245,18 +255,6 @@ fi
 echo "the catalog at https://kcp.localhost:8443/services/marketplace lists widgets.acme.example"
 
 step "console"
-console_image=${CONSOLE_IMAGE:-kcp-hub/console:dev}
-if [ -n "$CONSOLE_IMAGE" ]; then
-  docker pull "$console_image"
-else
-  docker build -t "$console_image" "$ROOT/console"
-fi
-# Loaded rather than pulled by the cluster, so a moved tag such as :main
-# reaches it too, through the image ID below.
-kind load docker-image "$console_image" --name "$CLUSTER_NAME"
-"${KUBECTL[@]}" kustomize "$DEPLOY/console" \
-  | sed "s|image: kcp-hub/console:dev|image: $console_image|" \
-  | "${KUBECTL[@]}" apply -f -
 "${KUBECTL[@]}" -n kcp wait certificate/console-tls --for=condition=Ready --timeout=2m
 restart_on_change kcp console console-tls "" "$(docker image inspect -f '{{.Id}}' "$console_image")"
 "${KUBECTL[@]}" -n kcp rollout status deployment/console --timeout=5m
