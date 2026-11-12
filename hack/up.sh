@@ -36,14 +36,21 @@ KUBECTL=(kubectl --context "kind-$CLUSTER_NAME")
 step() { printf '\n==> %s\n' "$*"; }
 
 # Makes a contrib-virtual-workspaces image available in the cluster:
-# pulled if it is published, otherwise built from CONTRIB_VERSION.
+# pulled by the cluster if it is published, otherwise built from
+# CONTRIB_VERSION and loaded. Published images are not loaded: they are
+# multi-platform, and kind cannot load one that docker pulled for a
+# single platform.
 contrib_image() {
   local target=$1 image=$2 src=$STATE/src/contrib-virtual-workspaces
   if docker exec "$CLUSTER_NAME-control-plane" crictl inspecti "$image" >/dev/null 2>&1; then
     echo "$image is already in the cluster"
     return
   fi
-  if ! docker image inspect "$image" >/dev/null 2>&1 && ! docker pull -q "$image" 2>/dev/null; then
+  if docker manifest inspect "$image" >/dev/null 2>&1; then
+    echo "$image is published; the cluster pulls it"
+    return
+  fi
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
     echo "$image is not published; building it from $CONTRIB_REPO at $CONTRIB_VERSION"
     if [ ! -d "$src/.git" ]; then
       git init -q "$src"
