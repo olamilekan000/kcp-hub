@@ -1,7 +1,10 @@
-# The web console at https://console.kcp.localhost:8443. Its server serves
-# the UI and passes /services and /clusters on to kcp's front-proxy with
-# the user's own token, so the browser stays on one origin and the console
-# holds no credential.
+{{- if .Values.console.enabled }}
+{{- if not .Values.oidc.issuerURL }}
+{{- fail "the console signs users in through OIDC: set oidc.issuerURL, or console.enabled=false" }}
+{{- end }}
+# The web console. Its server serves the UI and passes /services and
+# /clusters on to kcp's front-proxy with the user's own token, so the
+# browser stays on one origin and the console holds no credential.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -9,10 +12,9 @@ metadata:
 spec:
   secretName: console-tls
   dnsNames:
-    - console.kcp.localhost
+    - {{ include "hub.consoleHostname" . }}
   issuerRef:
-    name: hub-ca
-    kind: ClusterIssuer
+    {{- include "hub.consoleIssuerRef" . | nindent 4 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -32,27 +34,27 @@ spec:
     spec:
       containers:
         - name: console
-          # Built from console/ and loaded into kind by hack/up.sh, which
-          # puts CONSOLE_IMAGE here instead when it is set.
-          image: kcp-hub/console:dev
-          imagePullPolicy: IfNotPresent
+          image: {{ .Values.console.image.repository }}:{{ .Values.console.image.tag }}
+          imagePullPolicy: {{ .Values.console.image.pullPolicy }}
           args:
             - --address=:8443
             - --tls-cert-file=/etc/console/tls/tls.crt
             - --tls-key-file=/etc/console/tls/tls.key
-            - --upstream=https://frontproxy-front-proxy.kcp.svc.cluster.local:8443
+            - --upstream=https://frontproxy-front-proxy.{{ .Release.Namespace }}.svc.cluster.local:8443
             - --upstream-ca-file=/etc/console/kcp-ca/ca.crt
-            # The same CA signs kcp.localhost, which users reach through
-            # the gateway's passthrough to the front-proxy.
+            # The same CA signs the front-proxy's public certificate, which
+            # users reach through the gateway's passthrough.
             - --kcp-ca-file=/etc/console/kcp-ca/ca.crt
           env:
             # Shown to users in instructions, so it is kcp's public address.
             - name: CONSOLE_KCP_SERVER
-              value: https://kcp.localhost:8443
+              value: https://{{ .Values.hostname }}:{{ .Values.port }}
             - name: CONSOLE_OIDC_ISSUER
-              value: https://dex.kcp.localhost:8443/dex
+              value: {{ .Values.oidc.issuerURL }}
             - name: CONSOLE_OIDC_CLIENT_ID
-              value: kcp
+              value: {{ .Values.oidc.clientID }}
+            - name: CONSOLE_OIDC_SCOPES
+              value: {{ .Values.console.oidcScopes }}
           ports:
             - containerPort: 8443
           readinessProbe:
@@ -94,18 +96,4 @@ spec:
   ports:
     - port: 8443
       targetPort: 8443
----
-apiVersion: gateway.networking.k8s.io/v1alpha3
-kind: TLSRoute
-metadata:
-  name: console
-spec:
-  parentRefs:
-    - name: eg
-      namespace: envoy-gateway-system
-  hostnames:
-    - console.kcp.localhost
-  rules:
-    - backendRefs:
-        - name: console
-          port: 8443
+{{- end }}

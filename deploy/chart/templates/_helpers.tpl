@@ -2,6 +2,20 @@
 root.{{ .Values.hostname }}
 {{- end }}
 
+{{- define "hub.consoleHostname" -}}
+{{ .Values.console.hostname | default (printf "console.%s" .Values.hostname) }}
+{{- end }}
+
+{{- define "hub.consoleIssuerRef" -}}
+{{- if .Values.console.tls.issuerRef.name -}}
+{{ toYaml .Values.console.tls.issuerRef }}
+{{- else -}}
+group: cert-manager.io
+kind: Issuer
+name: selfsigned
+{{- end }}
+{{- end }}
+
 {{- define "hub.issuerRef" -}}
 {{- if .Values.tls.issuerRef.name -}}
 {{ toYaml .Values.tls.issuerRef }}

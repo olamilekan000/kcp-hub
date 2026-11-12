@@ -41,7 +41,7 @@ lint: lint-yaml lint-shell lint-chart ## Run all linters
 
 .PHONY: lint-chart
 lint-chart: ## Lint the Helm chart, with its defaults and with the local values (needs helm)
-	helm lint deploy/chart --set gateway.parentRef.name=eg --set contrib.tag=lint
+	helm lint deploy/chart --set gateway.parentRef.name=eg --set contrib.tag=lint --set oidc.issuerURL=https://idp.example.com
 	helm lint deploy/chart -f deploy/local/values.yaml --set contrib.tag=lint
 
 .PHONY: lint-yaml

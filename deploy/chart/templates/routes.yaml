@@ -1,6 +1,10 @@
 {{- if .Values.gateway.enabled }}
 {{- $parent := .Values.gateway.parentRef }}
-{{- range $name, $route := dict "front-proxy" (list .Values.hostname "frontproxy-front-proxy" 8443) "root" (list (include "hub.rootHostname" .) "root-kcp" 6443) }}
+{{- $routes := dict "front-proxy" (list .Values.hostname "frontproxy-front-proxy" 8443) "root" (list (include "hub.rootHostname" .) "root-kcp" 6443) }}
+{{- if .Values.console.enabled }}
+{{- $_ := set $routes "console" (list (include "hub.consoleHostname" .) "console" 8443) }}
+{{- end }}
+{{- range $name, $route := $routes }}
 ---
 apiVersion: gateway.networking.k8s.io/v1alpha3
 kind: TLSRoute

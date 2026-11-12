@@ -1,4 +1,4 @@
-{{- if not .Values.tls.issuerRef.name }}
+{{- if or (not .Values.tls.issuerRef.name) (and .Values.console.enabled (not .Values.console.tls.issuerRef.name)) }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:

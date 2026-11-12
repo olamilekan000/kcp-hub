@@ -32,6 +32,28 @@ tenancy:
   # platform admin.
   selfServiceTenants: false
 
+# The web console. It signs users in through the OIDC provider below, so
+# it needs oidc.issuerURL.
+console:
+  enabled: true
+  # Defaults to console.<hostname>. It has to point at the gateway too.
+  hostname: ""
+  image:
+    repository: ghcr.io/olamilekan000/kcp-hub/console
+    tag: main
+    pullPolicy: IfNotPresent
+  # The scopes the console asks the OIDC provider for. The ID token has to
+  # carry the username and groups claims set under oidc.
+  oidcScopes: openid email groups
+  tls:
+    # The cert-manager issuer of the console's certificate. Browsers have
+    # to trust it, so use one such as Let's Encrypt or your company's CA.
+    # Empty uses a self-signed certificate, which browsers warn about.
+    issuerRef: {}
+    #   group: cert-manager.io
+    #   kind: ClusterIssuer
+    #   name: letsencrypt
+
 tls:
   # The cert-manager issuer kcp-operator creates kcp's CA from. Empty
   # creates a self-signed Issuer in the release namespace.
