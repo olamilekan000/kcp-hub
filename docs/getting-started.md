@@ -193,11 +193,5 @@ This deletes the kind cluster and everything in `.hub/`.
 
 - [How it fits together](../README.md#how-it-fits-together) explains what
   runs where.
-- To install kcp hub in your own cluster, use the Helm chart in
-  [`deploy/chart`](../deploy/chart). Its [`values.yaml`](../deploy/chart/values.yaml)
-  lists the settings: the hostname, TLS, your OIDC provider, platform admins,
-  and whether users may create their own tenants.
-  [`deploy/local/values.yaml`](../deploy/local/values.yaml) is what
-  `make up` uses. The cluster needs cert-manager, kcp-operator, etcd and a
-  Gateway API gateway with a TLS passthrough listener; `hack/up.sh` shows
-  how the local setup installs each of them.
+- [Installing in your cluster](install.md) installs kcp hub with your own
+  domain and sign-in provider.
