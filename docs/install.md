@@ -144,9 +144,9 @@ hostname: kcp.example.com
 port: 443
 
 # The tenancy and marketplace images. A contrib-virtual-workspaces
-# release such as v0.2.0 is tagged 0.2.0.
+# release such as v0.1.2 is tagged 0.1.2.
 contrib:
-  tag: "0.2.0"
+  tag: "0.1.2"
 
 oidc:
   issuerURL: https://login.example.com
