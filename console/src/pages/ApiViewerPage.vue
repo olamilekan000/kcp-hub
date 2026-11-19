@@ -160,7 +160,7 @@ watch(groupVersion, loadKinds)
           You are not in any project yet, so there is nothing to browse: the explorer shows the APIs
           served inside a project, such as the ones enabled from the Catalog.
         </p>
-        <RouterLink to="/welcome" class="text-accent hover:underline">Create a tenant and a project →</RouterLink>
+        <RouterLink to="/overview" class="text-accent hover:underline">Create a tenant and a project →</RouterLink>
       </template>
       <p v-else>Pick a project at the top to browse the APIs it serves.</p>
     </div>

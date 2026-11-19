@@ -169,20 +169,20 @@ function exampleOf(r: OfferingResource, v: Version): string {
                   <span class="text-danger">*</span> required
                 </p>
               </div>
-              <CodeBlock :title="`Example ${r.kind || r.resource}`" :text="exampleOf(r, v)" />
+              <CodeBlock :title="`Example ${r.kind || r.resource}`" :text="exampleOf(r, v)" lang="yaml" />
               <details class="group">
                 <summary class="cursor-pointer text-[11px] text-accent hover:underline select-none">
                   OpenAPI schema
                 </summary>
                 <div class="pt-2">
-                  <CodeBlock :title="`${r.kind || r.resource} ${v.name}`" :text="stringify(v.schema ?? {})" />
+                  <CodeBlock :title="`${r.kind || r.resource} ${v.name}`" :text="stringify(v.schema ?? {})" lang="yaml" />
                 </div>
               </details>
             </div>
           </section>
         </div>
 
-        <CodeBlock v-else title="The catalog entry" :text="raw" />
+        <CodeBlock v-else title="The catalog entry" :text="raw" lang="yaml" />
       </div>
 
       <div class="px-4 py-2.5 border-t border-edge">

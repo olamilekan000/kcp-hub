@@ -53,7 +53,7 @@ const value = computed({
     <Spinner :size="12" />
     Loading projects…
   </span>
-  <RouterLink v-else to="/welcome" class="text-xs text-muted hover:text-ink">
+  <RouterLink v-else to="/overview" class="text-xs text-muted hover:text-ink">
     Get started →
   </RouterLink>
 </template>

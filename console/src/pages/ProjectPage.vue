@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // The selected project at a glance, and how to reach it from a terminal.
+// Before there is any project, the same page walks through making one.
 // Everything here is read with the user's own token, so a viewer sees
 // what a viewer may; the counts that need more are left out rather than
 // shown as zero.
@@ -8,8 +9,12 @@ import { useSession } from '@/stores/session'
 import { settings } from '@/lib/settings'
 import * as oidc from '@/lib/oidc'
 import { canonicalPath, exportsIn, isPublished } from '@/lib/publish'
+import { bindings, offerings } from '@/lib/api'
+import { providedAPIs, usedAPIs, type ProvidedAPI, type UsedAPI } from '@/lib/map'
 import { fileName, kubeconfig, snippets } from '@/lib/kubeconfig'
 import PageHeader from '@/components/PageHeader.vue'
+import ProjectMap from '@/components/ProjectMap.vue'
+import GetStarted from '@/components/GetStarted.vue'
 import Panel from '@/components/Panel.vue'
 import StateBlock from '@/components/StateBlock.vue'
 import RoleBadge from '@/components/RoleBadge.vue'
@@ -23,15 +28,29 @@ const project = computed(() => session.currentProject)
 const path = ref('')
 const published = ref<number | null>(null)
 const loading = ref(false)
+const used = ref<UsedAPI[]>([])
+const provided = ref<ProvidedAPI[] | null>(null)
 
 async function load() {
   path.value = ''
   published.value = null
+  used.value = []
+  provided.value = null
   if (!workspace.value) return
   loading.value = true
-  const [p, ex] = await Promise.allSettled([canonicalPath(workspace.value), exportsIn(workspace.value)])
+  const [p, ex, b, o] = await Promise.allSettled([
+    canonicalPath(workspace.value),
+    exportsIn(workspace.value),
+    bindings(workspace.value),
+    offerings(),
+  ])
   path.value = p.status === 'fulfilled' ? p.value : ''
   published.value = ex.status === 'fulfilled' ? ex.value.filter(isPublished).length : null
+  provided.value = ex.status === 'fulfilled' ? providedAPIs(ex.value) : null
+  used.value =
+    b.status === 'fulfilled'
+      ? usedAPIs(b.value.items ?? [], o.status === 'fulfilled' ? (o.value.items ?? []) : [])
+      : []
   loading.value = false
 }
 
@@ -94,6 +113,13 @@ watch(workspace, load)
 <template>
   <div>
     <PageHeader
+      v-if="session.nothingToWorkIn"
+      title="Welcome"
+      :subtitle="session.username"
+      eyebrow="Getting set up"
+    />
+    <PageHeader
+      v-else
       :title="project?.displayName || session.project || 'Project'"
       :subtitle="session.tenant ? `A project in ${session.tenant}` : ''"
     />
@@ -101,12 +127,9 @@ watch(workspace, load)
     <div v-if="!workspace && (session.loading || session.error)" class="k-card">
       <StateBlock :loading="session.loading" :error="session.error" />
     </div>
-    <div v-else-if="!workspace" class="k-card px-4 py-6 text-xs text-muted space-y-2">
-      <template v-if="!session.projects.length">
-        <p>You are not in a project yet.</p>
-        <RouterLink to="/welcome" class="text-accent hover:underline">Create a tenant and a project →</RouterLink>
-      </template>
-      <p v-else>Pick a project at the top.</p>
+    <GetStarted v-else-if="session.nothingToWorkIn" />
+    <div v-else-if="!workspace" class="k-card px-4 py-6 text-xs text-muted">
+      Pick a project at the top.
     </div>
 
     <div v-else class="space-y-4">
@@ -136,20 +159,16 @@ watch(workspace, load)
       </div>
 
       <Panel>
-        <template #header>Enabled here</template>
-        <StateBlock v-if="!session.enabledLoaded" loading />
-        <div v-else-if="!enabled.length" class="px-4 py-4 text-xs text-muted">
-          Nothing yet. <RouterLink to="/catalog" class="text-accent hover:underline">Browse the catalog →</RouterLink>
-        </div>
-        <ul v-else class="divide-y divide-edge">
-          <li v-for="e in enabled" :key="e.binding">
-            <RouterLink :to="`/p/${e.binding}`" class="px-4 py-2.5 flex items-center gap-3 hover:bg-overlay/40">
-              <span class="text-xs font-medium">{{ e.label }}</span>
-              <span class="font-mono text-[10px] text-faint">{{ e.binding }}</span>
-              <span class="ml-auto text-[11px] text-muted">{{ e.kinds.join(', ') }}</span>
-            </RouterLink>
-          </li>
-        </ul>
+        <template #header>How this project connects</template>
+        <StateBlock v-if="loading" loading />
+        <ProjectMap
+          v-else
+          :project="project?.displayName || session.project"
+          :tenant="session.tenant"
+          :path="path"
+          :used="used"
+          :provided="provided"
+        />
       </Panel>
 
       <Panel>

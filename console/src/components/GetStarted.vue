@@ -1,19 +1,19 @@
 <script setup lang="ts">
-// First run: somebody signed in and belongs to nothing.
+// First run, shown on the Overview page: somebody signed in and belongs to
+// nothing.
 //
 // That is a real state, not an error — a fresh identity has no tenant and
 // no project, and every other screen in this app is relative to a project.
 // Rather than show them all empty, this asks for the two things that have
-// to exist and makes them, in order, explaining what each one is for.
+// to exist and makes them, in order, explaining what each one is for. Once
+// the project is selected, the Overview page shows it instead.
 //
 // Both steps are requests to the virtual workspace rather than writes:
 // nobody can create a tenant record or reach into a tenant workspace
 // themselves. The server does it after deciding the caller may.
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useSession } from '@/stores/session'
 import { ApiError, requestProject, requestTenant } from '@/lib/api'
-import PageHeader from '@/components/PageHeader.vue'
 import Panel from '@/components/Panel.vue'
 import Stepper from '@/components/Stepper.vue'
 import NestingDiagram from '@/components/NestingDiagram.vue'
@@ -21,7 +21,6 @@ import Spinner from '@/components/Spinner.vue'
 import StateBlock from '@/components/StateBlock.vue'
 
 const session = useSession()
-const router = useRouter()
 
 /** The step we are on, which is just "what does not exist yet". */
 const step = computed<'tenant' | 'project' | 'done'>(() => {
@@ -142,8 +141,6 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-3xl">
-    <PageHeader title="Welcome" :subtitle="session.username" eyebrow="Getting set up" />
-
     <!-- Left to right: how much of this is left, at a glance. -->
     <div class="k-card px-5 py-4 mb-4">
       <Stepper :steps="STEPS" :current="step" />
@@ -162,9 +159,7 @@ onMounted(async () => {
     <div v-else class="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] items-start">
       <Panel>
         <template #header>
-          {{ step === 'tenant' ? 'Name your tenant'
-             : step === 'project' ? `Add a project to ${tenant?.name}`
-             : 'You are set up' }}
+          {{ step === 'tenant' ? 'Name your tenant' : `Add a project to ${tenant?.name}` }}
         </template>
 
         <div v-if="step === 'tenant'" class="px-4 py-3.5 space-y-3">
@@ -194,7 +189,7 @@ onMounted(async () => {
           <p class="text-[11px] text-faint">Lowercase letters, digits and dashes.</p>
         </div>
 
-        <div v-else-if="step === 'project'" class="px-4 py-3.5 space-y-3">
+        <div v-else class="px-4 py-3.5 space-y-3">
           <p class="text-[11px] text-faint leading-relaxed">
             A project is where your work happens. The APIs you enable from the
             catalog, and the ones you share with other teams, belong to a
@@ -217,22 +212,6 @@ onMounted(async () => {
             >
               <Spinner v-if="busy" />
               {{ busy ? 'Creating…' : 'Create' }}
-            </button>
-          </div>
-        </div>
-
-        <div v-else class="px-4 py-3.5 space-y-3">
-          <p class="text-[11px] text-faint leading-relaxed">
-            Working in
-            <span class="font-medium text-ink">{{ session.tenant }}/{{ session.project }}</span>.
-            The picker at the top switches between projects.
-          </p>
-          <div class="flex gap-2">
-            <button class="k-btn k-btn--primary" @click="router.push('/catalog')">
-              Browse the Catalog
-            </button>
-            <button class="k-btn k-btn--ghost" @click="router.push('/tenants')">
-              Manage tenants
             </button>
           </div>
         </div>

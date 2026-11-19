@@ -261,7 +261,7 @@ watch(workspace, load)
     <div v-else-if="!workspace" class="k-card px-4 py-6 text-xs text-muted space-y-2">
       <template v-if="!session.projects.length">
         <p>You publish from a project, and you are not in one yet.</p>
-        <RouterLink to="/welcome" class="text-accent hover:underline">Create a tenant and a project →</RouterLink>
+        <RouterLink to="/overview" class="text-accent hover:underline">Create a tenant and a project →</RouterLink>
       </template>
       <p v-else>Pick a project at the top to publish from it.</p>
     </div>
