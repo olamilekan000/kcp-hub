@@ -4,6 +4,7 @@
 // a producer's text is safe to show.
 import { computed, ref, watch } from 'vue'
 import { render, sections, type Block, type Variables } from '@/lib/instructions'
+import YamlEditor from '@/components/YamlEditor.vue'
 
 const props = defineProps<{
   instructions: Record<string, string> | undefined
@@ -69,7 +70,10 @@ async function copy(text: string, i: number) {
         </ul>
 
         <div v-else-if="b.kind === 'code'" class="relative group">
-          <pre class="font-mono text-[11px] leading-relaxed bg-overlay border border-edge rounded-[4px] px-3 py-2.5 overflow-auto whitespace-pre">{{ b.text }}</pre>
+          <div v-if="b.lang === 'yaml' || b.lang === 'yml'" class="border border-edge rounded-[4px] overflow-hidden">
+            <YamlEditor :model-value="b.text" readonly />
+          </div>
+          <pre v-else class="font-mono text-[11px] leading-relaxed bg-overlay border border-edge rounded-[4px] px-3 py-2.5 overflow-auto whitespace-pre">{{ b.text }}</pre>
           <div class="absolute top-1.5 right-1.5 flex items-center gap-1.5">
             <span v-if="b.lang" class="k-badge k-badge--muted">{{ b.lang }}</span>
             <button class="k-btn k-btn--ghost !px-2 !py-0.5 text-[10px]" @click="copy(b.text, i)">

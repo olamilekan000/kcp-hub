@@ -15,10 +15,7 @@ onMounted(async () => {
     session.claims = oidc.claims()
     await session.load()
     await session.checkAdmin()
-    // Signing in without a particular page in mind, and with no project to
-    // work in yet, is the first run: the wizard is the useful place to land.
-    const target = oidc.returnTo()
-    router.replace(target === '/' && session.nothingToWorkIn ? { name: 'welcome' } : target)
+    router.replace(oidc.returnTo())
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   }

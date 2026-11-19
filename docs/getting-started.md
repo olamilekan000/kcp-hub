@@ -80,7 +80,8 @@ These test users exist, all with the password `password`:
 
 ## 5. Create a tenant and a project
 
-Alice is in no tenant yet, so the console opens on the **Welcome** page.
+Alice is in no tenant yet, so the console opens on **Get started**, which
+walks her through making one.
 
 1. Name your tenant, for example `team-a`, and click **Create**. A tenant is
    your team's account. You become its admin.
@@ -144,7 +145,7 @@ Back as alice, the Gadget API now shows **in the catalog**.
 
 1. In the private window, click **Sign out** at the top right, then sign
    in as `bob@team-b.example.com`.
-2. Create a tenant and a project for him on the **Welcome** page, such as
+2. Create a tenant and a project for him on **Get started**, such as
    `team-b` and `app`.
 3. Open **Catalog**. **Gadgets** is listed. Click **Enable**, then **Open**,
    open **Gadget** and create one.

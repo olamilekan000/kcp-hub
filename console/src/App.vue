@@ -30,16 +30,16 @@ const tenantNav = computed(() =>
     : [],
 )
 
-// The top of the sidebar is this project's own things; what you could add
-// to it, and discovery over it, sit at the bottom.
+// The top of the sidebar is the project and what you could add to it;
+// discovery over it sits at the bottom.
 const nav = computed(() => {
   const items: { to: string; label: string }[] = []
-  // Until there is a project to work in, the wizard that makes one stays
-  // one click away, wherever else they have wandered.
-  if (session.nothingToWorkIn) items.push({ to: '/welcome', label: 'Get started' })
-  if (session.workspace) items.push({ to: '/project', label: 'Overview' })
-  if (session.admin) items.push({ to: '/admin', label: 'Admin' })
+  // Until there is a project to work in, the overview is the wizard that
+  // makes one, so it stays one click away wherever else they have wandered.
+  items.push({ to: '/overview', label: session.nothingToWorkIn ? 'Get started' : 'Overview' })
+  items.push({ to: '/catalog', label: 'Catalog' })
   if (session.workspace) items.push({ to: '/publish', label: 'Publish' })
+  if (session.admin) items.push({ to: '/admin', label: 'Admin' })
   return items
 })
 
@@ -61,24 +61,12 @@ const enabledNav = computed(() => {
 
 // The bottom of the sidebar is about the place rather than the work done
 // in it.
-const bottomNav = [
-  { to: '/catalog', label: 'Catalog' },
-  { to: '/api', label: 'API Explorer' },
-]
+const bottomNav = [{ to: '/api', label: 'API Explorer' }]
 
 onMounted(async () => {
   if (!session.authenticated) return
   await session.load()
   await session.checkAdmin()
-  await router.isReady()
-
-  // Somebody with no project who opens the console at its root lands on
-  // the wizard, which asks for whichever of tenant and project is missing.
-  // A page they opened by name keeps them there: the tenant and admin pages
-  // work without a project, and the pages that need one say so.
-  if (session.nothingToWorkIn && route.redirectedFrom?.path === '/') {
-    router.replace({ name: 'welcome' })
-  }
 })
 
 watch(() => session.tenant, () => session.checkAdmin())

@@ -35,6 +35,8 @@ import Spinner from '@/components/Spinner.vue'
 import ObjectEditor from '@/components/ObjectEditor.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Modal from '@/components/Modal.vue'
+import YamlEditor from '@/components/YamlEditor.vue'
+import { stringify } from 'yaml'
 
 const route = useRoute()
 const session = useSession()
@@ -371,7 +373,7 @@ watch([workspace, resource, group], () => {
           <span>{{ nameOf(subject) || 'Object' }}</span>
           <span class="ml-auto k-badge k-badge--muted">read-only</span>
         </template>
-        <pre class="px-4 py-3 font-mono text-[11px] leading-relaxed overflow-auto max-h-[60vh] text-muted">{{ JSON.stringify(subject, null, 2) }}</pre>
+        <YamlEditor :model-value="stringify(subject)" readonly />
         <div class="px-4 py-2.5 border-t border-edge">
           <button class="k-btn k-btn--ghost" @click="close">Close</button>
         </div>

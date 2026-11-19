@@ -14,6 +14,7 @@ import { parse, stringify } from 'yaml'
 import type { OpenAPISchema } from '@/lib/api'
 import { setValueAt, shapeOf, valueAt, type FormField } from '@/lib/form'
 import Spinner from '@/components/Spinner.vue'
+import YamlEditor from '@/components/YamlEditor.vue'
 
 const props = defineProps<{
   /** The object to edit; changing it reloads the buffers. */
@@ -239,16 +240,9 @@ function save() {
     </div>
 
     <!-- YAML -->
-    <textarea
-      v-else
-      v-model="text"
-      spellcheck="false"
-      class="w-full font-mono text-[11px] leading-relaxed px-4 py-3 bg-transparent resize-y outline-none min-h-[22rem]"
-      @keydown.ctrl.enter="save"
-      @keydown.meta.enter="save"
-    />
+    <YamlEditor v-else v-model="text" @submit="save" />
 
-    <p v-if="parseError" class="k-note k-note--danger mx-4 mb-3">{{ parseError }}</p>
+    <p v-if="parseError" class="k-note k-note--danger mx-4 my-3">{{ parseError }}</p>
 
     <div class="px-4 py-2.5 border-t border-edge flex items-center gap-2">
       <button class="k-btn k-btn--primary" :disabled="busy" @click="save">

@@ -114,12 +114,11 @@ those two prefixes to the front-proxy itself.
 
 | | |
 |---|---|
-| **Welcome** | first run: an identity that belongs to nothing gets a tenant and a project, in that order |
-| **Overview** | the selected project: what is enabled and published in it, your access, and a kubeconfig with commands to try |
+| **Overview** | the selected project: a map of the APIs it uses and provides, your access, and a kubeconfig with commands to try. On first run, where an identity that belongs to nothing gets a tenant and a project, in that order |
 | **Tenants** | the tenants you belong to and your role in each; creating one |
 | **A tenant** | one tenant managed: the projects in it, your role, and adding a project |
 | **A producer** | one enabled producer in this project: what it is, how to use it, what it serves |
-| **Catalog** | what you could enable, and enabling one into the selected project (bottom of the sidebar, with the API Explorer) |
+| **Catalog** | what you could enable, and enabling one into the selected project |
 | **A provider's resource** | whatever an enabled offering serves: list, create, edit and delete it |
 | **API Explorer** | discovery for the selected workspace: which groups are served, which kinds, and the objects |
 | **Publish** | the producer's side: offering the selected project's own APIs in the catalog |
@@ -144,14 +143,18 @@ yet — nothing about it is selectable, so nothing else would reach it.
 
 ## First run
 
-Somebody with no project, whether they belong to nothing at all or to a
-tenant nobody has added a project to, lands on **Welcome** when they sign
-in or open the console at its root, rather than on a set of empty panels. A page opened by name keeps them there instead: the tenant and
+Everyone lands on **Overview** (`/overview`) when they sign in, open the
+console at its root, or click **kcp Platform** in the header. Somebody with
+no project, whether they belong to nothing at all or to a tenant nobody
+has added a project to, sees the setup steps there under a Welcome
+heading rather than a set of empty panels, and the sidebar entry reads
+**Get started**. A page opened by name keeps them there instead: the tenant and
 admin pages work without a project, so a platform admin who has none can
 still refresh `/admin`, and the pages that do need one say so and link
 here.
 
-Welcome renders inside the normal frame rather than as a page beside it: a
+Once the first project exists the same page shows it, so there is no
+separate page to outgrow. The setup renders inside the normal frame: a
 first run is still a session, so the identity, Tenants and Sign out stay
 where they always are, and the project picker shows "Get started →"
 instead of pretending there is something to pick.
